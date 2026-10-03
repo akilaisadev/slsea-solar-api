@@ -1,4 +1,5 @@
 import { etagOf, isNotModified } from './conditional.js';
+import { paginated } from './pagination.js';
 
 // Sends a representation with its validators (WSO2 §8.2) and honours
 // conditional GET (§10.4): if the client already holds this exact
@@ -22,4 +23,11 @@ export function sendRepresentation(req, res, body, { lastModified, status = 200,
     return res.status(304).end();
   }
   res.status(status).type('application/json').send(json);
+}
+
+// Sends one page of a collection (WSO2 §10.3) built from a repository page
+// ({ count, rows, lastModified }), mapping each row to its representation.
+export function sendPage(req, res, page, { offset, limit }, toItem) {
+  const body = paginated(req, { count: page.count, offset, limit, items: page.rows.map(toItem) });
+  sendRepresentation(req, res, body, { lastModified: page.lastModified });
 }

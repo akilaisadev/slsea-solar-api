@@ -32,6 +32,9 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Lint the JavaScript
+        run: npm run lint
       - name: Lint the OpenAPI document
         run: npm run lint:openapi
-      - run: npm test
+      - name: Test with coverage gate (lines 95%, branches 90%, functions 95%)
+        run: npm run test:coverage

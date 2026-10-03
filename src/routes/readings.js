@@ -3,9 +3,9 @@ import { z } from 'zod';
 import { allowOnly } from '../middleware/allow.js';
 import { requireScope } from '../middleware/authenticate.js';
 import { parseQuery } from '../lib/validate.js';
-import { paginated, paginationParams } from '../lib/pagination.js';
+import { paginationParams } from '../lib/pagination.js';
 import { scopeOf } from '../lib/jurisdiction.js';
-import { sendRepresentation } from '../lib/respond.js';
+import { sendPage } from '../lib/respond.js';
 import { listRegionalReadings } from '../repositories/readings.js';
 import { toReading } from '../representations.js';
 import { jurisdictionParams, jurisdictionFiltersOf, timeWindowParams, timeWindowOf, order } from './queryParams.js';
@@ -42,8 +42,6 @@ readingsRouter.route('/')
       offset,
       limit,
     });
-    sendRepresentation(req, res, paginated(req, { count: page.count, offset, limit, items: page.rows.map(toReading) }), {
-      lastModified: page.lastModified,
-    });
+    sendPage(req, res, page, query, toReading);
   })
   .all(allowOnly('GET'));

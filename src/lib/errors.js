@@ -26,6 +26,7 @@ export const ERROR_CATALOGUE = {
   41501: { status: 415, description: 'Unsupported media type', resolution: 'Send the request body as application/json (or application/merge-patch+json for PATCH).' },
   42901: { status: 429, description: 'Too many requests', resolution: 'Too many token requests from this client. Wait and retry after the period in the RateLimit headers.' },
   50001: { status: 500, description: 'Internal server error', resolution: 'An unexpected error occurred. Retry later; if it persists, report it with the request time.' },
+  50301: { status: 503, description: 'Service unavailable', resolution: 'The database is temporarily unreachable (it may be resuming from idle). Retry after the number of seconds in the Retry-After header.' },
 };
 
 export class ApiError extends Error {

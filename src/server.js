@@ -12,7 +12,11 @@ const server = app.listen(config.port, () => {
   console.log(`SLSEA Solar API listening on port ${config.port}`);
 });
 
-// Render sends SIGTERM on redeploy: stop accepting requests, then close the pool.
-process.on('SIGTERM', () => {
+// Render sends SIGTERM on redeploy, and Ctrl+C sends SIGINT locally: stop
+// accepting requests, let in-flight ones finish, then close the pool.
+function shutdown(signal) {
+  console.log(`${signal} received, shutting down`);
   server.close(() => db.end().then(() => process.exit(0)));
-});
+}
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);

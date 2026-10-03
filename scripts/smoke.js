@@ -31,7 +31,7 @@ async function call(url, { token, method = 'GET', headers = {}, body, type } = {
   return { status: res.status, headers: res.headers, text, json };
 }
 
-async function token(form) {
+async function requestToken(form) {
   const res = await call(`${base}/oauth2/token`, {
     method: 'POST', type: 'application/x-www-form-urlencoded', body: new URLSearchParams(form).toString(),
   });
@@ -52,10 +52,10 @@ check('GET /openapi.json', 'OpenAPI 3.1.0', spec.json?.openapi, spec.json?.opena
 const anonymous = await call(`${API}/provinces`);
 check('no token', '401 + Bearer challenge', `${anonymous.status} ${anonymous.headers.get('www-authenticate')}`,
   anonymous.status === 401 && /^Bearer/.test(anonymous.headers.get('www-authenticate') ?? ''));
-const nationalLogin = await token({ grant_type: 'password', username: 'national.analyst', password: DEMO_PASSWORD });
+const nationalLogin = await requestToken({ grant_type: 'password', username: 'national.analyst', password: DEMO_PASSWORD });
 check('password grant', '200 Bearer', `${nationalLogin.status} ${nationalLogin.json?.token_type}`, nationalLogin.status === 200);
 const national = nationalLogin.json?.access_token;
-const colombo = (await token({ grant_type: 'password', username: 'colombo.analyst', password: DEMO_PASSWORD })).json?.access_token;
+const colombo = (await requestToken({ grant_type: 'password', username: 'colombo.analyst', password: DEMO_PASSWORD })).json?.access_token;
 
 // --- read path
 const provinces = await call(`${API}/provinces`, { token: national });
@@ -101,7 +101,7 @@ check('Colombo user filters by Kandy', '403', crossFilter.status, crossFilter.st
 // --- write path
 if (!readOnly) {
   if (!DEVICE_SECRET_SEED) throw new Error('DEVICE_SECRET_SEED must be set for write checks (or pass --read-only)');
-  const deviceLogin = await token({ grant_type: 'client_credentials', client_id: 'ins-0001', client_secret: deriveDeviceSecret(DEVICE_SECRET_SEED, 'ins-0001') });
+  const deviceLogin = await requestToken({ grant_type: 'client_credentials', client_id: 'ins-0001', client_secret: deriveDeviceSecret(DEVICE_SECRET_SEED, 'ins-0001') });
   check('client credentials grant (device)', '200, readings:write', `${deviceLogin.status}, ${deviceLogin.json?.scope}`, deviceLogin.json?.scope === 'readings:write');
   const device = deviceLogin.json?.access_token;
 
@@ -128,7 +128,7 @@ if (!readOnly) {
   const plain = await call(`${API}/installations/ins-0001/readings`, { token: device, method: 'POST', body: 'x', type: 'text/plain' });
   check('POST text/plain', '415', plain.status, plain.status === 415);
 
-  const admin = (await token({ grant_type: 'password', username: 'asset.admin', password: DEMO_PASSWORD })).json?.access_token;
+  const admin = (await requestToken({ grant_type: 'password', username: 'asset.admin', password: DEMO_PASSWORD })).json?.access_token;
   const stale = await call(`${API}/installations/ins-0001`, {
     token: admin, method: 'PATCH', type: 'application/merge-patch+json', headers: { 'If-Match': '"stale-etag"' }, body: { status: 'maintenance' },
   });

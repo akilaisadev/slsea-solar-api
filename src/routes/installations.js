@@ -6,13 +6,14 @@ import { requireScope } from '../middleware/authenticate.js';
 import { requireBodyType } from '../middleware/negotiate.js';
 import { ApiError } from '../lib/errors.js';
 import { parseQuery, parseBody } from '../lib/validate.js';
-import { paginated, paginationParams } from '../lib/pagination.js';
+import { paginationParams } from '../lib/pagination.js';
 import { scopeOf } from '../lib/jurisdiction.js';
-import { sendRepresentation } from '../lib/respond.js';
+import { sendRepresentation, sendPage } from '../lib/respond.js';
 import { etagOf, preconditionFails } from '../lib/conditional.js';
 import { absoluteUrl } from '../lib/urls.js';
 import { generateDeviceSecret, hashDeviceSecret } from '../lib/credentials.js';
 import { colomboToday } from '../lib/time.js';
+import { SRI_LANKA_BOUNDS, MAX_CAPACITY_KW } from '../lib/limits.js';
 import { withTransaction } from '../db/transaction.js';
 import {
   listInstallations, findInstallation, insertInstallation, updateInstallation, decommissionInstallation,
@@ -39,9 +40,9 @@ const listQuery = z.strictObject({
 const fields = {
   inverter_id: z.string().regex(/^[A-Z0-9][A-Z0-9-]{3,39}$/, 'must be 4-40 uppercase letters, digits or hyphens'),
   substation_id: z.string().regex(/^gss-[0-9]{3}$/, 'must look like gss-001'),
-  capacity_kw: z.number().positive().max(500),
-  latitude: z.number().min(5.8).max(10),
-  longitude: z.number().min(79.4).max(82),
+  capacity_kw: z.number().positive().max(MAX_CAPACITY_KW),
+  latitude: z.number().min(SRI_LANKA_BOUNDS.minLatitude).max(SRI_LANKA_BOUNDS.maxLatitude),
+  longitude: z.number().min(SRI_LANKA_BOUNDS.minLongitude).max(SRI_LANKA_BOUNDS.maxLongitude),
   commissioned_on: z.iso.date().refine((d) => d <= colomboToday(), 'cannot be in the future'),
   status: z.enum(['active', 'maintenance']),
 };
@@ -106,9 +107,7 @@ installationsRouter.route('/')
     const page = await listInstallations(req.app.locals.db, {
       scope: scopeOf(req), filters, sort: query.sort, order: query.order, offset, limit,
     });
-    sendRepresentation(req, res, paginated(req, { count: page.count, offset, limit, items: page.rows.map(toInstallation) }), {
-      lastModified: page.lastModified,
-    });
+    sendPage(req, res, page, query, toInstallation);
   })
   // POST /installations: the collection is the factory for its members
   // (WSO2 §7.3). The server assigns the id and the device secret, and

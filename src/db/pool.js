@@ -12,5 +12,25 @@ pg.types.setTypeParser(pg.types.builtins.INT8, (value) => Number(value));
 pg.types.setTypeParser(pg.types.builtins.DATE, (value) => value);
 
 export function createPool(connectionString) {
-  return new pg.Pool({ connectionString, max: 10 });
+  const pool = new pg.Pool({
+    connectionString,
+    max: 10,
+    // Fail a request after 10 s instead of waiting forever for a connection,
+    // so an unreachable database becomes a prompt 503 rather than a hang.
+    connectionTimeoutMillis: 10_000,
+    idleTimeoutMillis: 30_000,
+  });
+  // A serverless database (Neon) closes idle connections when it scales to
+  // zero. pg reports that as an 'error' event on the pool; with no listener
+  // Node treats it as unhandled and the whole API process would crash. The
+  // pool simply opens a fresh connection for the next query.
+  pool.on('error', (err) => {
+    console.error(`Idle database connection closed: ${err.message}`);
+  });
+  return pool;
+}
+
+// The cheapest possible round trip, used by the readiness probe.
+export function pingDatabase(db) {
+  return db.query('SELECT 1');
 }

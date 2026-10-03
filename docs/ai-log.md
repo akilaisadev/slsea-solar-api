@@ -266,3 +266,23 @@ Each increment records the prompt I gave, what was generated, and what the revie
 **Review notes:**
 - The evidence pack first said "17 URI templates". That count included the health, errors and token paths. Corrected to the 13 resource URI templates under `/solar/v1`.
 - On integrity: the report prose is mine to write. The evidence pack deliberately contains only facts, tables and bullet points.
+
+---
+
+## Code-quality pass (development branch)
+
+**Prompt:** "make development branch and make some code quality improvements according to CW". Rubric dimension 4 asks for a coherent, well-structured codebase, with generator mistakes identified and repaired.
+
+**Generated:** `eslint.config.js` with a CI lint step; database resilience in `src/db/pool.js` and `src/middleware/errorHandler.js`; shared helpers (`loadInScope` in `src/routes/loaders.js`, `sendPage` in `src/lib/respond.js`); `src/lib/limits.js`; a coverage gate; `test/resilience.test.js` and `test/guards.test.js`; and the README code-structure section.
+
+**Review findings and fixes:**
+
+| # | Finding | Why it matters | Fix |
+|---|---|---|---|
+| 1 | ESLint found three shadowed names. In one test, a local variable called `after` hid the test framework's `after()` hook, so a later edit could have silently broken cleanup. There was also a stale `eslint-disable` comment. | Code clarity | Renamed (`afterInsert`, `tx`, `requestToken`); removed the stale comment. Lint now runs in CI. |
+| 2 | **Crash risk on the target platform:** the PostgreSQL pool had no `'error'` listener. Neon closes idle connections when it scales to zero, and node-postgres then emits `'error'` on the pool. With no listener, Node treats that as unhandled and the API process exits. | Deployment and operation | Added a pool error listener (tested by emitting an error on a real pool). |
+| 3 | A connection attempt could wait forever, and an unreachable database surfaced as a generic 500. | §9, operability | 10-second connection timeout; connectivity failures map to **503** with `Retry-After` (catalogue code 50301). Tested with a stand-in database that refuses connections. |
+| 4 | The "find, 404, then jurisdiction 403" lookup was written three times, and the paginated-response block six times. Copies like this drift apart. | Maintainability | One `loadInScope()` and one `sendPage()`. All tests passed unchanged, so behaviour is identical. |
+| 5 | Validation limits were bare numbers (`max(500)`, `min(5.8)`, `* 1.25`) with no explanation. | Readability, viva | Named constants with reasons in `src/lib/limits.js`, matching the database CHECK constraints. |
+| 6 | Coverage was measured for the first time: 98.8% lines, 94.2% branches, 99.4% functions. The untested lines were safety nets: the startup config check, fail-closed jurisdiction, the generic 500 (now checked not to leak internal error text), unknown error codes, and client credentials without a secret. | Test validity | Added tests for each. Coverage is now 99.8% lines, 95.4% branches and 100% functions, gated in CI (95/90/95). I confirmed the gate fails a run below its threshold. |
+| 7 | The one SQL statement in a route file was the readiness probe's `SELECT 1`. | Layering | Moved into `src/db` (`pingDatabase`). The README documents the layering rules, and a check shows no route contains SQL and no repository touches `req`/`res`. |

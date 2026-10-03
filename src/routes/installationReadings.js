@@ -6,9 +6,10 @@ import { requireScope } from '../middleware/authenticate.js';
 import { requireBodyType } from '../middleware/negotiate.js';
 import { ApiError } from '../lib/errors.js';
 import { parseQuery, parseBody } from '../lib/validate.js';
-import { paginated, paginationParams } from '../lib/pagination.js';
-import { sendRepresentation } from '../lib/respond.js';
+import { paginationParams } from '../lib/pagination.js';
+import { sendRepresentation, sendPage } from '../lib/respond.js';
 import { absoluteUrl } from '../lib/urls.js';
+import { CLOCK_SKEW_MS, MAX_POWER_TO_CAPACITY_RATIO, MAX_VOLTAGE_V } from '../lib/limits.js';
 import {
   listInstallationReadings, findReading, findReadingBefore, findReadingAt, insertReading,
 } from '../repositories/readings.js';
@@ -35,10 +36,9 @@ const readingBody = z.strictObject({
   recorded_at: z.iso.datetime({ offset: true, error: 'must be an ISO 8601 date-time such as 2026-10-03T08:45:00Z' }),
   power_kw: z.number().min(0),
   energy_kwh: z.number().min(0),
-  voltage_v: z.number().min(0).max(500),
+  voltage_v: z.number().min(0).max(MAX_VOLTAGE_V),
 });
 
-const CLOCK_SKEW_MS = 5 * 60 * 1000;
 
 function invalidField(field, message) {
   return new ApiError(40002, 'The request body is invalid.', { errors: [{ code: 40002, field, message }] });
@@ -60,9 +60,7 @@ installationReadingsRouter.route('/')
       offset,
       limit,
     });
-    sendRepresentation(req, res, paginated(req, { count: page.count, offset, limit, items: page.rows.map(toReading) }), {
-      lastModified: page.lastModified,
-    });
+    sendPage(req, res, page, query, toReading);
   })
   // POST: a metering device appends one reading for its own installation.
   // 201 Created + Location of the new reading (WSO2 §7.3, §9).
@@ -76,8 +74,8 @@ installationReadingsRouter.route('/')
     if (recordedAt.getTime() > Date.now() + CLOCK_SKEW_MS) {
       throw invalidField('recorded_at', 'cannot be in the future');
     }
-    if (reading.power_kw > installation.capacity_kw * 1.25) {
-      throw invalidField('power_kw', `exceeds 125% of the installation's ${installation.capacity_kw} kW capacity`);
+    if (reading.power_kw > installation.capacity_kw * MAX_POWER_TO_CAPACITY_RATIO) {
+      throw invalidField('power_kw', `exceeds ${MAX_POWER_TO_CAPACITY_RATIO * 100}% of the installation's ${installation.capacity_kw} kW capacity`);
     }
     const previous = await findReadingBefore(db, installation.installation_id, recordedAt);
     if (previous && reading.energy_kwh < previous.energy_kwh) {

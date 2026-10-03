@@ -2,15 +2,15 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { allowOnly } from '../middleware/allow.js';
 import { requireScope } from '../middleware/authenticate.js';
-import { ApiError } from '../lib/errors.js';
 import { parseQuery } from '../lib/validate.js';
-import { paginated, paginationParams } from '../lib/pagination.js';
-import { scopeOf, assertInScope } from '../lib/jurisdiction.js';
-import { sendRepresentation } from '../lib/respond.js';
-import { listDistricts, findDistrict } from '../repositories/hierarchy.js';
-import { toDistrict, toGenerationSummary } from '../representations.js';
-import { districtGenerationSummary, REPORTING_WINDOW_MINUTES } from '../repositories/summaries.js';
+import { paginationParams } from '../lib/pagination.js';
+import { scopeOf } from '../lib/jurisdiction.js';
+import { sendRepresentation, sendPage } from '../lib/respond.js';
 import { colomboToday, TIMEZONE } from '../lib/time.js';
+import { listDistricts } from '../repositories/hierarchy.js';
+import { districtGenerationSummary, REPORTING_WINDOW_MINUTES } from '../repositories/summaries.js';
+import { toDistrict, toGenerationSummary } from '../representations.js';
+import { loadDistrict } from './loaders.js';
 import { jurisdictionParams, jurisdictionFiltersOf } from './queryParams.js';
 
 export const districtsRouter = Router();
@@ -26,22 +26,13 @@ const listQuery = z.strictObject({
 districtsRouter.route('/')
   .get(requireScope('assets:read'), async (req, res) => {
     const query = parseQuery(listQuery, req);
-    const { offset, limit } = query;
     const filters = await jurisdictionFiltersOf(req, query);
-    const page = await listDistricts(req.app.locals.db, { scope: scopeOf(req), filters, offset, limit });
-    sendRepresentation(req, res, paginated(req, { count: page.count, offset, limit, items: page.rows.map(toDistrict) }), {
-      lastModified: page.lastModified,
+    const page = await listDistricts(req.app.locals.db, {
+      scope: scopeOf(req), filters, offset: query.offset, limit: query.limit,
     });
+    sendPage(req, res, page, query, toDistrict);
   })
   .all(allowOnly('GET'));
-
-async function loadDistrict(req) {
-  const { districtId } = req.params;
-  const district = await findDistrict(req.app.locals.db, districtId);
-  if (!district) throw new ApiError(40401, `District '${districtId}' was not found.`);
-  assertInScope(scopeOf(req), district, `District '${districtId}'`);
-  return district;
-}
 
 districtsRouter.route('/:districtId')
   .get(requireScope('assets:read'), async (req, res) => {
