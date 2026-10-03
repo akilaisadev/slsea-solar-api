@@ -18,7 +18,9 @@
     "lint:openapi": "npx --yes @redocly/cli@2 lint openapi/openapi.yaml",
     "lint": "eslint .",
     "pretest": "node --env-file-if-exists=.env.test scripts/migrate.js --reset && node --env-file-if-exists=.env.test scripts/seed.js --small && node --env-file-if-exists=.env.test scripts/check-seed.js --small",
-    "test": "node --env-file-if-exists=.env.test --test --test-concurrency=1 \"test/**/*.test.js\""
+    "test": "node --env-file-if-exists=.env.test --test --test-concurrency=1 \"test/**/*.test.js\"",
+    "pretest:coverage": "npm run pretest",
+    "test:coverage": "node --env-file-if-exists=.env.test --test --test-concurrency=1 --experimental-test-coverage --test-coverage-include='src/**' --test-coverage-lines=95 --test-coverage-branches=90 --test-coverage-functions=95 \"test/**/*.test.js\""
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
