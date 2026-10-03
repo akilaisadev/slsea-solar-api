@@ -6,8 +6,8 @@ import { requireScope } from '../middleware/authenticate.js';
 import { requireBodyType } from '../middleware/negotiate.js';
 import { ApiError } from '../lib/errors.js';
 import { parseQuery, parseBody } from '../lib/validate.js';
-import { paginated, paginationParams } from '../lib/pagination.js';
-import { sendRepresentation } from '../lib/respond.js';
+import { paginationParams } from '../lib/pagination.js';
+import { sendRepresentation, sendPage } from '../lib/respond.js';
 import { absoluteUrl } from '../lib/urls.js';
 import {
   listInstallationReadings, findReading, findReadingBefore, findReadingAt, insertReading,
@@ -60,9 +60,7 @@ installationReadingsRouter.route('/')
       offset,
       limit,
     });
-    sendRepresentation(req, res, paginated(req, { count: page.count, offset, limit, items: page.rows.map(toReading) }), {
-      lastModified: page.lastModified,
-    });
+    sendPage(req, res, page, query, toReading);
   })
   // POST: a metering device appends one reading for its own installation.
   // 201 Created + Location of the new reading (WSO2 §7.3, §9).

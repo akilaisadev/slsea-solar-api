@@ -6,9 +6,9 @@ import { requireScope } from '../middleware/authenticate.js';
 import { requireBodyType } from '../middleware/negotiate.js';
 import { ApiError } from '../lib/errors.js';
 import { parseQuery, parseBody } from '../lib/validate.js';
-import { paginated, paginationParams } from '../lib/pagination.js';
+import { paginationParams } from '../lib/pagination.js';
 import { scopeOf } from '../lib/jurisdiction.js';
-import { sendRepresentation } from '../lib/respond.js';
+import { sendRepresentation, sendPage } from '../lib/respond.js';
 import { etagOf, preconditionFails } from '../lib/conditional.js';
 import { absoluteUrl } from '../lib/urls.js';
 import { generateDeviceSecret, hashDeviceSecret } from '../lib/credentials.js';
@@ -106,9 +106,7 @@ installationsRouter.route('/')
     const page = await listInstallations(req.app.locals.db, {
       scope: scopeOf(req), filters, sort: query.sort, order: query.order, offset, limit,
     });
-    sendRepresentation(req, res, paginated(req, { count: page.count, offset, limit, items: page.rows.map(toInstallation) }), {
-      lastModified: page.lastModified,
-    });
+    sendPage(req, res, page, query, toInstallation);
   })
   // POST /installations: the collection is the factory for its members
   // (WSO2 §7.3). The server assigns the id and the device secret, and
