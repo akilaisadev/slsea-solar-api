@@ -32,6 +32,8 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Lint the JavaScript
+        run: npm run lint
       - name: Lint the OpenAPI document
         run: npm run lint:openapi
       - run: npm test

@@ -114,9 +114,9 @@ function emptyBatch() {
 
 // One INSERT per batch: unnest() turns six parallel arrays into rows, so
 // the statement has six parameters however many rows it carries.
-async function insertReadings(client, b) {
+async function insertReadings(tx, b) {
   if (b.installation_id.length === 0) return 0;
-  const { rowCount } = await client.query(
+  const { rowCount } = await tx.query(
     `INSERT INTO generation_reading (installation_id, recorded_at, power_kw, energy_kwh, voltage_v, received_at)
      SELECT * FROM unnest($1::text[], $2::timestamptz[], $3::numeric[], $4::numeric[], $5::numeric[], $6::timestamptz[])`,
     [b.installation_id, b.recorded_at, b.power_kw, b.energy_kwh, b.voltage_v, b.received_at],

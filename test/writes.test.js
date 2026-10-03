@@ -176,7 +176,7 @@ test('PUT replaces the whole resource, is idempotent, and requires every field',
   const second = await admin.put(uri).send(replacement);
   assert.equal(second.headers.etag, first.headers.etag, 'same request, same resulting state');
 
-  const { status, ...partial } = replacement; // eslint-disable-line no-unused-vars
+  const { status, ...partial } = replacement;
   const incomplete = await admin.put(uri).send(partial);
   assertErrorBody(incomplete, 400, 40002);
   assert.equal(incomplete.body.errors[0].field, 'status');

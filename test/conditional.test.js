@@ -82,10 +82,10 @@ test('a new reading changes the validators, so the old ETag no longer matches', 
     SELECT installation_id, recorded_at + interval '15 minutes', power_kw, energy_kwh + 0.1, voltage_v,
            received_at + interval '15 minutes'
     FROM generation_reading WHERE installation_id = 'ins-0007' ORDER BY recorded_at DESC LIMIT 1`);
-  const after = await national.get(path).set('If-None-Match', before.headers.etag);
-  assert.equal(after.status, 200);
-  assert.notEqual(after.headers.etag, before.headers.etag);
-  assert.ok(Date.parse(after.headers['last-modified']) > Date.parse(before.headers['last-modified']));
+  const afterInsert = await national.get(path).set('If-None-Match', before.headers.etag);
+  assert.equal(afterInsert.status, 200);
+  assert.notEqual(afterInsert.headers.etag, before.headers.etag);
+  assert.ok(Date.parse(afterInsert.headers['last-modified']) > Date.parse(before.headers['last-modified']));
 });
 
 test('preconditionFails implements If-Match (strong) and If-Unmodified-Since', () => {
