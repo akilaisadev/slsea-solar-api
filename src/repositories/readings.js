@@ -74,6 +74,41 @@ export function listRegionalReadings(db, { scope, filters, window, sort, order, 
   });
 }
 
+// The reading immediately before an instant, used to check that the
+// cumulative energy counter never runs backwards.
+export async function findReadingBefore(db, installationId, instant) {
+  const { rows } = await db.query(
+    `SELECT ${READING_COLUMNS} FROM generation_reading r
+     WHERE r.installation_id = $1 AND r.recorded_at < $2
+     ORDER BY r.recorded_at DESC LIMIT 1`,
+    [installationId, instant],
+  );
+  return rows[0] ?? null;
+}
+
+// Appends one reading. received_at is set by the database clock, never by
+// the client. Returns null if a reading already exists for that instant
+// (the unique constraint makes a retried upload harmless).
+export async function insertReading(db, installationId, reading) {
+  const { rows } = await db.query(
+    `INSERT INTO generation_reading (installation_id, recorded_at, power_kw, energy_kwh, voltage_v)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT ON CONSTRAINT generation_reading_unique_instant DO NOTHING
+     RETURNING reading_id, installation_id, recorded_at, power_kw, energy_kwh, voltage_v, received_at`,
+    [installationId, reading.recorded_at, reading.power_kw, reading.energy_kwh, reading.voltage_v],
+  );
+  return rows[0] ?? null;
+}
+
+export async function findReadingAt(db, installationId, instant) {
+  const { rows } = await db.query(
+    `SELECT ${READING_COLUMNS} FROM generation_reading r
+     WHERE r.installation_id = $1 AND r.recorded_at = $2`,
+    [installationId, instant],
+  );
+  return rows[0] ?? null;
+}
+
 export async function findReading(db, installationId, readingId) {
   const { rows } = await db.query(
     `SELECT ${READING_COLUMNS} FROM generation_reading r

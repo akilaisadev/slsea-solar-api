@@ -180,3 +180,24 @@ Each increment records the prompt I gave, what was generated, and what the revie
 | 7 | Swagger UI's client-credentials flow sends credentials as HTTP Basic, which the first version ignored. | RFC 6749 §2.3.1 | The token endpoint accepts client credentials in the body or as Basic. Tested both ways. |
 
 **Scope design (report material):** scopes express *what* a client may do (`readings:write`, `assets:read`, `readings:read`, `installations:write`); *where* a user may read is a signed `jurisdiction` claim enforced in every SQL query. The alternative, one scope per jurisdiction (`read:district:ds-01`, ...), would need 35+ scopes and still couldn't express "this district's province name". The claim-plus-query approach is effectively attribute-based access control (WSO2 §12.3) without a separate XACML policy engine.
+
+---
+
+## Increment 10: Write path (device ingestion and installation CRUD)
+
+**Prompt context:** the approved plan, increment 10; brief §5 "Write path" (201 + Location on create; correct create/retrieve/update/delete semantics and idempotency); WSO2 §7, §9 and §10.5; the S7/S8 generator-mistake lists (200 instead of 201, missing or unresolvable Location, PUT as a partial update, vehicle id taken from the body, cascade-deleting history, a second DELETE returning 200).
+
+**Generated:** POST/PUT/PATCH/DELETE on `/installations`, POST on `/installations/{id}/readings`, `src/db/transaction.js`, write repositories, `test/writes.test.js` (13 tests), and the OpenAPI write operations and schemas.
+
+**Review findings and fixes:**
+
+| # | Finding | Guideline | Fix |
+|---|---|---|---|
+| 1 | After increment 9's fail-closed change, reusing the user loader for device writes would have refused **every** device with 403, because a device has no jurisdiction. | Write-read split | A separate `loadDeviceInstallation()`: the token's `sub` must equal the path's installation **before** any database lookup, so a device can't even probe which installation IDs exist. |
+| 2 | `POST /installations` returns a one-time `device_secret` in the body. An ETag hashed from that body would never equal the ETag a later GET returns, so it would be useless for `If-Match`. | §8.2, §10.5 | `sendRepresentation` accepts an ETag override. The 201's ETag is the GET representation's, and a test asserts they're equal. |
+| 3 | Checking `If-Match` and then writing in separate statements leaves a race window: two admins could both pass the check, and the second would silently overwrite the first. | §10.5 | Check and write run in one transaction with `SELECT … FOR UPDATE` on the installation row. |
+| 4 | **My own generator mistakes, caught in review:** the update query selected `capacity_kw` twice, and the DELETE used `INSTALLATION_COLUMNS.replaceAll('i.', '')` to build its RETURNING list, a string trick that would break silently if a column name contained "i.". | Clarity | Removed the duplicate; wrote the RETURNING column list out explicitly. |
+| 5 | Catching the unique-violation exception for duplicate readings would abort the statement and conflate it with other errors. | Robustness | `INSERT … ON CONFLICT ON CONSTRAINT generation_reading_unique_instant DO NOTHING`, then 409 with the URI of the existing reading. Retries are therefore harmless, even though POST itself isn't idempotent. |
+| 6 | **Test-data mistake (mine):** the first ingestion tests posted the *next 15-minute slot*, which can be up to 15 minutes in the future just after a seed. The API correctly answered 400 ("cannot be in the future"). | Test validity | Tests post one minute after the latest reading. The API's 5-minute clock-skew rule stays. |
+| 7 | The `If-Match` test first sent a PUT without `status`, which got 400 rather than 412. Validation runs before the precondition, which RFC 9110 allows: an invalid request is rejected whatever its preconditions. | §9 | The test now sends a complete body. The ordering is documented behaviour. |
+| 8 | S7/S8 checklist: POST returns 201 with an absolute `Location` that resolves (tested); ETag and Last-Modified are sent; PUT requires every field (tested); PATCH uses JSON Merge Patch; the installation comes from the path and a body `installation_id` is rejected; DELETE gives 200 then 404; readings survive decommissioning (tested); PUT/PATCH/DELETE on readings get 405 with `Allow`. | §7, §9 | Verified. |

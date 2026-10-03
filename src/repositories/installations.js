@@ -37,15 +37,58 @@ export function listInstallations(db, { scope, filters = {}, sort = 'installatio
   });
 }
 
-export async function findInstallation(db, installationId) {
+// `forUpdate` locks the installation row until the surrounding transaction
+// ends, so a precondition check (If-Match) and the write it guards cannot be
+// interleaved with another writer's.
+export async function findInstallation(db, installationId, { forUpdate = false } = {}) {
   const { rows } = await db.query(
     `SELECT ${INSTALLATION_COLUMNS}, i.updated_at,
             s.name AS substation_name, d.district_id, d.name AS district_name,
             p.province_id, p.name AS province_name
      FROM ${FROM_INSTALLATIONS}
      JOIN province p ON p.province_id = d.province_id
-     WHERE i.installation_id = $1 AND i.status <> 'decommissioned'`,
+     WHERE i.installation_id = $1 AND i.status <> 'decommissioned'
+     ${forUpdate ? 'FOR UPDATE OF i' : ''}`,
     [installationId],
   );
   return rows[0] ?? null;
+}
+
+// Writable fields of an installation; the id, the secret hash and the
+// audit timestamps are always set by the server.
+const WRITABLE = ['inverter_id', 'substation_id', 'capacity_kw', 'latitude', 'longitude', 'commissioned_on', 'status'];
+
+export async function insertInstallation(db, fields, deviceSecretHash) {
+  const { rows } = await db.query(
+    `INSERT INTO solar_installation (${WRITABLE.join(', ')}, device_secret_hash)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+     RETURNING installation_id`,
+    [...WRITABLE.map((column) => fields[column]), deviceSecretHash],
+  );
+  return rows[0].installation_id;
+}
+
+// PUT and PATCH both end here: `fields` holds every writable field for a
+// replacement, or only the changed ones for a partial update. Column names
+// come from the WRITABLE whitelist, never from the client.
+export async function updateInstallation(db, installationId, fields) {
+  const columns = WRITABLE.filter((column) => column in fields);
+  const assignments = columns.map((column, i) => `${column} = $${i + 2}`);
+  await db.query(
+    `UPDATE solar_installation SET ${assignments.join(', ')} WHERE installation_id = $1`,
+    [installationId, ...columns.map((column) => fields[column])],
+  );
+}
+
+// DELETE is a soft delete: the installation leaves the API, but its
+// readings remain as an audit record of generation that happened.
+export async function decommissionInstallation(db, installationId) {
+  const { rows } = await db.query(
+    `UPDATE solar_installation SET status = 'decommissioned', decommissioned_at = now()
+     WHERE installation_id = $1
+     RETURNING installation_id, inverter_id, substation_id, capacity_kw, latitude, longitude,
+               commissioned_on, status, decommissioned_at`,
+    [installationId],
+  );
+  return rows[0];
 }

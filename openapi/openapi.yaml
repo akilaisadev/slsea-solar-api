@@ -62,6 +62,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Health' }
+        '406': { $ref: '#/components/responses/NotAcceptable' }
   /errors/{error-code}:
     servers:
       - url: /
@@ -344,6 +345,39 @@ paths:
         - oauth2:
             - assets:read
         - bearerAuth: []
+    post:
+      tags: [ Installations ]
+      summary: Register a new installation (asset administrators)
+      description: |
+        The collection is the factory for its members (WSO2 §7.3). The server assigns `installation_id` and
+        a device secret, which is returned **once** in `device_secret` (only its hash is stored). The
+        response body is the new resource's composite plus that secret; `ETag` and `Last-Modified` describe
+        the resource as `GET` will return it.
+      operationId: createInstallation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InstallationCreate' }
+      responses:
+        '201':
+          description: Created.
+          headers:
+            Location: { $ref: '#/components/headers/Location' }
+            ETag: { $ref: '#/components/headers/ETag' }
+            Last-Modified: { $ref: '#/components/headers/Last-Modified' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InstallationCreated' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+      security:
+        - oauth2:
+            - installations:write
+        - bearerAuth: []
   /installations/{installation-id}:
     parameters:
       - $ref: '#/components/parameters/InstallationId'
@@ -375,6 +409,103 @@ paths:
         - oauth2:
             - assets:read
             - readings:read
+        - bearerAuth: []
+    put:
+      tags: [ Installations ]
+      summary: Replace an installation (whole-resource replacement)
+      description: |
+        PUT replaces the complete resource (WSO2 §7.2): every writable field is required; a missing field is
+        an error, not "keep the old value" (use PATCH for that). Idempotent. Send `If-Match` with the ETag
+        you last saw to avoid overwriting someone else's change (412 if it is stale).
+      operationId: replaceInstallation
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/IfUnmodifiedSince'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InstallationInput' }
+      responses:
+        '200':
+          description: Replaced; the new representation.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+            Last-Modified: { $ref: '#/components/headers/Last-Modified' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InstallationComposite' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+      security:
+        - oauth2:
+            - installations:write
+        - bearerAuth: []
+    patch:
+      tags: [ Installations ]
+      summary: Update some fields of an installation (JSON Merge Patch)
+      description: |
+        Partial update as a JSON Merge Patch (RFC 7396): send only the fields to change. `If-Match` gives
+        optimistic concurrency control (412 if stale).
+      operationId: updateInstallation
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/IfUnmodifiedSince'
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema: { $ref: '#/components/schemas/InstallationPatch' }
+          application/json:
+            schema: { $ref: '#/components/schemas/InstallationPatch' }
+      responses:
+        '200':
+          description: Updated; the new representation.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+            Last-Modified: { $ref: '#/components/headers/Last-Modified' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InstallationComposite' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+      security:
+        - oauth2:
+            - installations:write
+        - bearerAuth: []
+    delete:
+      tags: [ Installations ]
+      summary: Decommission an installation
+      description: |
+        Removes the installation from the API (WSO2 §7.4): 200 the first time, 404 afterwards. Its readings
+        are kept as generation history, and its device can no longer obtain tokens.
+      operationId: decommissionInstallation
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/IfUnmodifiedSince'
+      responses:
+        '200':
+          description: Decommissioned; the installation as it was when it left service.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DecommissionedInstallation' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+      security:
+        - oauth2:
+            - installations:write
         - bearerAuth: []
   /installations/{installation-id}/last-reading:
     parameters:
@@ -441,6 +572,41 @@ paths:
       security:
         - oauth2:
             - readings:read
+        - bearerAuth: []
+    post:
+      tags: [ Readings ]
+      summary: Append a generation reading (metering devices)
+      description: |
+        A device appends one reading for **its own** installation (the token's subject must match the path:
+        otherwise 403). The installation comes from the URI, never the body; `reading_id` and `received_at`
+        are set by the server. One reading per installation per instant: re-sending one gets 409 with the
+        URI of the existing reading, so retries are harmless. Cumulative `energy_kwh` may not fall below the
+        previous reading, `power_kw` may not exceed 125% of capacity, and `recorded_at` may not be in the future.
+      operationId: createReading
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReadingInput' }
+      responses:
+        '201':
+          description: Created; `Location` is the new reading's URI.
+          headers:
+            Location: { $ref: '#/components/headers/Location' }
+            ETag: { $ref: '#/components/headers/ETag' }
+            Last-Modified: { $ref: '#/components/headers/Last-Modified' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Reading' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+      security:
+        - oauth2:
+            - readings:write
         - bearerAuth: []
   /readings:
     get:
@@ -590,6 +756,16 @@ components:
       schema:
         type: string
         example: '"mEAzF-1JA3Rf1t23EW0ibWnB8G3hbfpW"'
+    IfMatch:
+      name: If-Match
+      in: header
+      description: ETag of the version being edited; the write is refused with 412 if it is no longer current.
+      schema: { type: string }
+    IfUnmodifiedSince:
+      name: If-Unmodified-Since
+      in: header
+      description: HTTP-date; the write is refused with 412 if the resource changed after it (ignored when If-Match is sent).
+      schema: { type: string }
     IfModifiedSince:
       name: If-Modified-Since
       in: header
@@ -631,9 +807,6 @@ components:
     Location:
       description: Absolute URI of the resource that was created.
       schema: { type: string, format: uri }
-    Allow:
-      description: Methods supported by this URI.
-      schema: { type: string, example: 'GET, HEAD, OPTIONS' }
     WWW-Authenticate:
       description: Authentication scheme and error (RFC 6750).
       schema: { type: string, example: 'Bearer realm="slsea", error="invalid_token"' }
@@ -779,6 +952,60 @@ components:
         - $ref: '#/components/schemas/Page'
         - properties:
             items: { type: array, items: { $ref: '#/components/schemas/Installation' } }
+    ReadingInput:
+      type: object
+      additionalProperties: false
+      required: [ recorded_at, power_kw, energy_kwh, voltage_v ]
+      properties:
+        recorded_at: { type: string, format: date-time, description: Measurement time (must not be in the future), example: '2026-10-03T09:00:00Z' }
+        power_kw: { type: number, minimum: 0, example: 1.2 }
+        energy_kwh: { type: number, minimum: 0, description: Cumulative lifetime counter; never lower than the previous reading, example: 38012.799 }
+        voltage_v: { type: number, minimum: 0, maximum: 500, example: 231.2 }
+    InstallationInput:
+      type: object
+      description: Every writable field of an installation (PUT replaces all of them).
+      additionalProperties: false
+      required: [ inverter_id, substation_id, capacity_kw, latitude, longitude, commissioned_on, status ]
+      properties:
+        inverter_id: { type: string, pattern: '^[A-Z0-9][A-Z0-9-]{3,39}$', example: INV-7F3A21C9 }
+        substation_id: { type: string, pattern: '^gss-[0-9]{3}$', example: gss-001 }
+        capacity_kw: { type: number, exclusiveMinimum: 0, maximum: 500, example: 6 }
+        latitude: { type: number, minimum: 5.8, maximum: 10, example: 6.91 }
+        longitude: { type: number, minimum: 79.4, maximum: 82, example: 79.88 }
+        commissioned_on: { type: string, format: date, description: Not in the future, example: '2026-09-15' }
+        status: { type: string, enum: [ active, maintenance ], example: active }
+    InstallationCreate:
+      allOf:
+        - $ref: '#/components/schemas/InstallationInput'
+      description: Same as InstallationInput, but status is optional and defaults to active.
+      required: [ inverter_id, substation_id, capacity_kw, latitude, longitude, commissioned_on ]
+    InstallationPatch:
+      type: object
+      description: Any non-empty subset of the writable fields (JSON Merge Patch).
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        inverter_id: { type: string, pattern: '^[A-Z0-9][A-Z0-9-]{3,39}$' }
+        substation_id: { type: string, pattern: '^gss-[0-9]{3}$' }
+        capacity_kw: { type: number, exclusiveMinimum: 0, maximum: 500 }
+        latitude: { type: number, minimum: 5.8, maximum: 10 }
+        longitude: { type: number, minimum: 79.4, maximum: 82 }
+        commissioned_on: { type: string, format: date }
+        status: { type: string, enum: [ active, maintenance ], example: maintenance }
+    InstallationCreated:
+      allOf:
+        - $ref: '#/components/schemas/InstallationComposite'
+        - type: object
+          required: [ device_secret ]
+          properties:
+            device_secret: { type: string, description: 'Shown once. The device authenticates with client_id = installation_id and this secret.' }
+    DecommissionedInstallation:
+      allOf:
+        - $ref: '#/components/schemas/Installation'
+        - type: object
+          properties:
+            status: { type: string, enum: [ decommissioned ] }
+            decommissioned_at: { type: string, format: date-time }
     TokenRequest:
       type: object
       required: [ grant_type ]
@@ -830,6 +1057,16 @@ components:
           schema: { $ref: '#/components/schemas/Error' }
     NotAcceptable:
       description: The Accept header excludes application/json.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Conflict:
+      description: The request conflicts with existing state (duplicate reading instant or inverter_id).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    PreconditionFailed:
+      description: If-Match / If-Unmodified-Since did not match the current resource; nothing was changed.
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }

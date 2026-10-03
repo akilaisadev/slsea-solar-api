@@ -31,6 +31,12 @@ export const toInstallation = (row) => ({
   status: row.status,
 });
 
+// What DELETE returns: the installation as it was when it left service.
+export const toDecommissionedInstallation = (row) => ({
+  ...toInstallation(row),
+  decommissioned_at: row.decommissioned_at,
+});
+
 export const toReading = (row) => ({
   reading_id: row.reading_id,
   installation_id: row.installation_id,
