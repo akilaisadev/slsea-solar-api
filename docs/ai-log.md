@@ -140,3 +140,21 @@ Each increment records the prompt I gave, what was generated, and what the revie
 | 3 | A time window with `from >= to`, or a non-ISO value like `from=yesterday`, would either error in SQL or silently return nothing. | §9 (400) | Validated as ISO 8601 with an offset; an empty window gets 400 with the field named. `from` is inclusive and `to` exclusive, so consecutive windows never double-count. |
 | 4 | Sort keys could be passed straight into `ORDER BY` (SQL injection). | Security | Sort keys are an enum mapped through a fixed column whitelist (`SORT_COLUMNS`); the direction comes from an enum. |
 | 5 | Measured cost: national unfiltered `/readings` (about 206k rows, with a count) takes 0.35–0.5 s locally; a single installation's history takes about 6 ms. | Performance | Acceptable at this scale. Recorded as a limitation for the critical evaluation (offset pagination plus `count(*)` versus keyset/cursor pagination). |
+
+---
+
+## Increment 8: Conditional GET and concurrency preconditions
+
+**Prompt context:** the approved plan, increment 8; brief §5 "Conditional GET … not-modified response with an empty body"; WSO2 §8, §10.4 and §10.5.
+
+**Generated:** `src/lib/conditional.js` (ETag, If-None-Match, If-Modified-Since, If-Match, If-Unmodified-Since), the updated `src/lib/respond.js`, `test/conditional.test.js`, and OpenAPI conditional parameters, validator headers and `304` on every GET (applied with a one-off script that edits the YAML document).
+
+**Review findings and fixes:**
+
+| # | Finding | Guideline | Fix |
+|---|---|---|---|
+| 1 | **Security:** the same URI returns different data to different jurisdictions. A shared cache (corporate proxy or CDN) that stored Colombo's `/installations` response could replay it to a Kandy user. | §10.4, §12 | Every representation is sent with `Cache-Control: private, no-cache` and `Vary: Authorization`. |
+| 2 | A collection replay with the current ETag returned **200, not 304** in tests. The cause: bodies contain absolute `next`/`previous` URLs built from the `Host` header, and supertest uses a new port per request, so the bytes and the ETag genuinely differed. | §10.4 | Correct behaviour (in production the host is fixed and part of the cache key). The test pins `Host`, and the comment explains why. |
+| 3 | HTTP dates have one-second precision, but `updated_at`/`received_at` have milliseconds. Comparing them directly would make `If-Modified-Since: <the exact Last-Modified sent>` look "modified" and always return 200. | RFC 9110 §13.1.3 | Both sides are compared in whole seconds. Tested. |
+| 4 | Tag comparison rules differ: `If-None-Match` uses weak comparison (`W/"x"` matches `"x"`); `If-Match` must use strong comparison (weak tags never match). A single comparison function would get one of them wrong. | RFC 9110 §8.8.3 | Two functions (`weakMatch`, `strongMatch`); unit tests cover lists, `*` and `W/`. |
+| 5 | Express's built-in ETag was switched off in increment 1, so these validators are generated explicitly and can be explained line by line. | §10.4 | Confirmed: `app.set('etag', false)` remains; the ETag is a SHA-256 of the exact JSON bytes. |

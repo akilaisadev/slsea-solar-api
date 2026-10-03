@@ -42,7 +42,7 @@ paths:
     servers:
       - url: /
     get:
-      tags: [Operations]
+      tags: [ Operations ]
       summary: Service and database health
       operationId: getHealth
       security: []
@@ -61,7 +61,7 @@ paths:
     servers:
       - url: /
     get:
-      tags: [Operations]
+      tags: [ Operations ]
       summary: Explanation of one error code (the target of every `more_info` link)
       operationId: getErrorCode
       security: []
@@ -80,27 +80,32 @@ paths:
 
   /provinces:
     get:
-      tags: [Hierarchy]
+      tags: [ Hierarchy ]
       summary: List provinces (collection)
       operationId: listProvinces
       parameters:
         - $ref: '#/components/parameters/Offset'
         - $ref: '#/components/parameters/Limit'
+        - { $ref: '#/components/parameters/IfNoneMatch' }
+        - { $ref: '#/components/parameters/IfModifiedSince' }
       responses:
         '200':
           description: A page of provinces within the caller's jurisdiction.
           headers:
             Last-Modified: { $ref: '#/components/headers/Last-Modified' }
+            ETag: { $ref: '#/components/headers/ETag' }
+            Cache-Control: { $ref: '#/components/headers/Cache-Control' }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProvinceCollection' }
+        '304': { $ref: '#/components/responses/NotModified' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '406': { $ref: '#/components/responses/NotAcceptable' }
   /provinces/{province-id}:
     parameters:
       - $ref: '#/components/parameters/ProvinceId'
     get:
-      tags: [Hierarchy]
+      tags: [ Hierarchy ]
       summary: Get one province (atomic)
       operationId: getProvince
       responses:
@@ -108,34 +113,45 @@ paths:
           description: The province.
           headers:
             Last-Modified: { $ref: '#/components/headers/Last-Modified' }
+            ETag: { $ref: '#/components/headers/ETag' }
+            Cache-Control: { $ref: '#/components/headers/Cache-Control' }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Province' }
+        '304': { $ref: '#/components/responses/NotModified' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+      parameters:
+        - { $ref: '#/components/parameters/IfNoneMatch' }
+        - { $ref: '#/components/parameters/IfModifiedSince' }
   /districts:
     get:
-      tags: [Hierarchy]
+      tags: [ Hierarchy ]
       summary: List districts (collection)
       operationId: listDistricts
       parameters:
         - $ref: '#/components/parameters/ProvinceIdFilter'
         - $ref: '#/components/parameters/Offset'
         - $ref: '#/components/parameters/Limit'
+        - { $ref: '#/components/parameters/IfNoneMatch' }
+        - { $ref: '#/components/parameters/IfModifiedSince' }
       responses:
         '200':
           description: A page of districts within the caller's jurisdiction.
           headers:
             Last-Modified: { $ref: '#/components/headers/Last-Modified' }
+            ETag: { $ref: '#/components/headers/ETag' }
+            Cache-Control: { $ref: '#/components/headers/Cache-Control' }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/DistrictCollection' }
+        '304': { $ref: '#/components/responses/NotModified' }
         '400': { $ref: '#/components/responses/BadRequest' }
   /districts/{district-id}:
     parameters:
       - $ref: '#/components/parameters/DistrictId'
     get:
-      tags: [Hierarchy]
+      tags: [ Hierarchy ]
       summary: Get one district (atomic)
       operationId: getDistrict
       responses:
@@ -143,14 +159,20 @@ paths:
           description: The district.
           headers:
             Last-Modified: { $ref: '#/components/headers/Last-Modified' }
+            ETag: { $ref: '#/components/headers/ETag' }
+            Cache-Control: { $ref: '#/components/headers/Cache-Control' }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/District' }
+        '304': { $ref: '#/components/responses/NotModified' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+      parameters:
+        - { $ref: '#/components/parameters/IfNoneMatch' }
+        - { $ref: '#/components/parameters/IfModifiedSince' }
   /grid-substations:
     get:
-      tags: [Hierarchy]
+      tags: [ Hierarchy ]
       summary: List grid substations (collection)
       operationId: listGridSubstations
       parameters:
@@ -158,20 +180,25 @@ paths:
         - $ref: '#/components/parameters/DistrictIdFilter'
         - $ref: '#/components/parameters/Offset'
         - $ref: '#/components/parameters/Limit'
+        - { $ref: '#/components/parameters/IfNoneMatch' }
+        - { $ref: '#/components/parameters/IfModifiedSince' }
       responses:
         '200':
           description: A page of grid substations within the caller's jurisdiction.
           headers:
             Last-Modified: { $ref: '#/components/headers/Last-Modified' }
+            ETag: { $ref: '#/components/headers/ETag' }
+            Cache-Control: { $ref: '#/components/headers/Cache-Control' }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/GridSubstationCollection' }
+        '304': { $ref: '#/components/responses/NotModified' }
         '400': { $ref: '#/components/responses/BadRequest' }
   /grid-substations/{substation-id}:
     parameters:
       - $ref: '#/components/parameters/SubstationId'
     get:
-      tags: [Hierarchy]
+      tags: [ Hierarchy ]
       summary: Get one grid substation (atomic)
       operationId: getGridSubstation
       responses:
@@ -179,14 +206,20 @@ paths:
           description: The grid substation.
           headers:
             Last-Modified: { $ref: '#/components/headers/Last-Modified' }
+            ETag: { $ref: '#/components/headers/ETag' }
+            Cache-Control: { $ref: '#/components/headers/Cache-Control' }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/GridSubstation' }
+        '304': { $ref: '#/components/responses/NotModified' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+      parameters:
+        - { $ref: '#/components/parameters/IfNoneMatch' }
+        - { $ref: '#/components/parameters/IfModifiedSince' }
   /installations:
     get:
-      tags: [Installations]
+      tags: [ Installations ]
       summary: List installations (collection)
       operationId: listInstallations
       parameters:
@@ -195,29 +228,34 @@ paths:
         - $ref: '#/components/parameters/SubstationIdFilter'
         - name: status
           in: query
-          schema: { type: string, enum: [active, maintenance] }
+          schema: { type: string, enum: [ active, maintenance ] }
         - name: sort
           in: query
-          schema: { type: string, enum: [installation_id, capacity_kw, commissioned_on], default: installation_id }
+          schema: { type: string, enum: [ installation_id, capacity_kw, commissioned_on ], default: installation_id }
         - name: order
           in: query
-          schema: { type: string, enum: [asc, desc], default: asc }
+          schema: { type: string, enum: [ asc, desc ], default: asc }
         - $ref: '#/components/parameters/Offset'
         - $ref: '#/components/parameters/Limit'
+        - { $ref: '#/components/parameters/IfNoneMatch' }
+        - { $ref: '#/components/parameters/IfModifiedSince' }
       responses:
         '200':
           description: A page of active and under-maintenance installations within the caller's jurisdiction.
           headers:
             Last-Modified: { $ref: '#/components/headers/Last-Modified' }
+            ETag: { $ref: '#/components/headers/ETag' }
+            Cache-Control: { $ref: '#/components/headers/Cache-Control' }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/InstallationCollection' }
+        '304': { $ref: '#/components/responses/NotModified' }
         '400': { $ref: '#/components/responses/BadRequest' }
   /installations/{installation-id}:
     parameters:
       - $ref: '#/components/parameters/InstallationId'
     get:
-      tags: [Installations]
+      tags: [ Installations ]
       summary: Get one installation with its location and latest reading (composite)
       description: |
         Composite resource (WSO2 §4.3): the installation, its place in the grid hierarchy and its most
@@ -228,16 +266,22 @@ paths:
           description: The installation composite.
           headers:
             Last-Modified: { $ref: '#/components/headers/Last-Modified' }
+            ETag: { $ref: '#/components/headers/ETag' }
+            Cache-Control: { $ref: '#/components/headers/Cache-Control' }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/InstallationComposite' }
+        '304': { $ref: '#/components/responses/NotModified' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+      parameters:
+        - { $ref: '#/components/parameters/IfNoneMatch' }
+        - { $ref: '#/components/parameters/IfModifiedSince' }
   /installations/{installation-id}/last-reading:
     parameters:
       - $ref: '#/components/parameters/InstallationId'
     get:
-      tags: [Readings]
+      tags: [ Readings ]
       summary: Latest reading of an installation (operational view)
       description: |
         Processing-function resource (WSO2 §4.5): derived from the time series on every request; nothing
@@ -248,16 +292,22 @@ paths:
           description: The most recent reading by measurement time.
           headers:
             Last-Modified: { $ref: '#/components/headers/Last-Modified' }
+            ETag: { $ref: '#/components/headers/ETag' }
+            Cache-Control: { $ref: '#/components/headers/Cache-Control' }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Reading' }
+        '304': { $ref: '#/components/responses/NotModified' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+      parameters:
+        - { $ref: '#/components/parameters/IfNoneMatch' }
+        - { $ref: '#/components/parameters/IfModifiedSince' }
   /installations/{installation-id}/readings:
     parameters:
       - $ref: '#/components/parameters/InstallationId'
     get:
-      tags: [Readings]
+      tags: [ Readings ]
       summary: Generation history of one installation (scoped collection)
       operationId: listInstallationReadings
       parameters:
@@ -267,20 +317,25 @@ paths:
         - $ref: '#/components/parameters/ReadingOrder'
         - $ref: '#/components/parameters/Offset'
         - $ref: '#/components/parameters/Limit'
+        - { $ref: '#/components/parameters/IfNoneMatch' }
+        - { $ref: '#/components/parameters/IfModifiedSince' }
       responses:
         '200':
           description: A page of readings, newest first. An installation with no readings returns an empty page.
           headers:
             Last-Modified: { $ref: '#/components/headers/Last-Modified' }
+            ETag: { $ref: '#/components/headers/ETag' }
+            Cache-Control: { $ref: '#/components/headers/Cache-Control' }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ReadingCollection' }
+        '304': { $ref: '#/components/responses/NotModified' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
   /readings:
     get:
-      tags: [Readings]
+      tags: [ Readings ]
       summary: Regional generation history across installations (analytical view)
       description: |
         Read-only view of readings across installations, filtered by jurisdiction (province, district or
@@ -298,14 +353,19 @@ paths:
         - $ref: '#/components/parameters/ReadingOrder'
         - $ref: '#/components/parameters/Offset'
         - $ref: '#/components/parameters/Limit'
+        - { $ref: '#/components/parameters/IfNoneMatch' }
+        - { $ref: '#/components/parameters/IfModifiedSince' }
       responses:
         '200':
           description: A page of readings.
           headers:
             Last-Modified: { $ref: '#/components/headers/Last-Modified' }
+            ETag: { $ref: '#/components/headers/ETag' }
+            Cache-Control: { $ref: '#/components/headers/Cache-Control' }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ReadingCollection' }
+        '304': { $ref: '#/components/responses/NotModified' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '403': { $ref: '#/components/responses/Forbidden' }
   /installations/{installation-id}/readings/{reading-id}:
@@ -313,7 +373,7 @@ paths:
       - $ref: '#/components/parameters/InstallationId'
       - $ref: '#/components/parameters/ReadingId'
     get:
-      tags: [Readings]
+      tags: [ Readings ]
       summary: One reading (the target of the Location header after ingestion)
       operationId: getReading
       responses:
@@ -321,11 +381,17 @@ paths:
           description: The reading.
           headers:
             Last-Modified: { $ref: '#/components/headers/Last-Modified' }
+            ETag: { $ref: '#/components/headers/ETag' }
+            Cache-Control: { $ref: '#/components/headers/Cache-Control' }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Reading' }
+        '304': { $ref: '#/components/responses/NotModified' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+      parameters:
+        - { $ref: '#/components/parameters/IfNoneMatch' }
+        - { $ref: '#/components/parameters/IfModifiedSince' }
 
 components:
   parameters:
@@ -368,11 +434,11 @@ components:
       name: sort
       in: query
       description: Field to sort by; recorded_at is the reading timestamp.
-      schema: { type: string, enum: [recorded_at, power_kw], default: recorded_at }
+      schema: { type: string, enum: [ recorded_at, power_kw ], default: recorded_at }
     ReadingOrder:
       name: order
       in: query
-      schema: { type: string, enum: [asc, desc], default: desc }
+      schema: { type: string, enum: [ asc, desc ], default: desc }
     ProvinceId:
       name: province-id
       in: path
@@ -398,6 +464,20 @@ components:
       in: path
       required: true
       schema: { type: integer, minimum: 1, example: 1 }
+    IfNoneMatch:
+      name: If-None-Match
+      in: header
+      description: ETag(s) of the copy the client holds; 304 if it is still current. Takes precedence over If-Modified-Since.
+      schema:
+        type: string
+        example: '"mEAzF-1JA3Rf1t23EW0ibWnB8G3hbfpW"'
+    IfModifiedSince:
+      name: If-Modified-Since
+      in: header
+      description: HTTP-date of the copy the client holds; 304 if unchanged since (ignored when If-None-Match is sent).
+      schema:
+        type: string
+        example: Sat, 03 Oct 2026 08:45:00 GMT
 
   securitySchemes:
     bearerAuth:
@@ -438,12 +518,17 @@ components:
     WWW-Authenticate:
       description: Authentication scheme and error (RFC 6750).
       schema: { type: string, example: 'Bearer realm="slsea", error="invalid_token"' }
+    Cache-Control:
+      description: "private, no-cache: responses depend on the caller's jurisdiction and must be revalidated."
+      schema:
+        type: string
+        example: private, no-cache
 
   schemas:
     Error:
       type: object
       description: The single error body used for every 4xx and 5xx response (WSO2 §11).
-      required: [code, message, description, more_info, errors]
+      required: [ code, message, description, more_info, errors ]
       properties:
         code: { type: integer, description: Product-specific error code (HTTP status x 100 + sequence), example: 40401 }
         message: { type: string, description: What went wrong with this request, example: "Installation 'ins-9999' was not found." }
@@ -455,7 +540,7 @@ components:
           items: { $ref: '#/components/schemas/ErrorListItem' }
     ErrorListItem:
       type: object
-      required: [code, message]
+      required: [ code, message ]
       properties:
         code: { type: integer, example: 40002 }
         field: { type: string, description: The body field or query parameter concerned, example: power_kw }
@@ -470,37 +555,37 @@ components:
     Page:
       type: object
       description: Paginated collection shape (WSO2 §10.3).
-      required: [count, offset, limit, next, previous, items]
+      required: [ count, offset, limit, next, previous, items ]
       properties:
         count: { type: integer, description: Total number of items matching the query (all pages), example: 25 }
         offset: { type: integer, example: 0 }
         limit: { type: integer, example: 50 }
-        next: { type: [string, 'null'], format: uri, description: 'Absolute URL of the next page, or null on the last page' }
-        previous: { type: [string, 'null'], format: uri, description: 'Absolute URL of the previous page, or null on the first page' }
+        next: { type: [ string, 'null' ], format: uri, description: 'Absolute URL of the next page, or null on the last page' }
+        previous: { type: [ string, 'null' ], format: uri, description: 'Absolute URL of the previous page, or null on the first page' }
         items: { type: array, items: {} }
     Province:
       type: object
-      required: [province_id, name]
+      required: [ province_id, name ]
       properties:
         province_id: { type: string, example: pv-01 }
         name: { type: string, example: Western }
     District:
       type: object
-      required: [district_id, name, province_id]
+      required: [ district_id, name, province_id ]
       properties:
         district_id: { type: string, example: ds-01 }
         name: { type: string, example: Colombo }
         province_id: { type: string, example: pv-01 }
     GridSubstation:
       type: object
-      required: [substation_id, name, district_id]
+      required: [ substation_id, name, district_id ]
       properties:
         substation_id: { type: string, example: gss-001 }
         name: { type: string, example: Kolonnawa Grid Substation }
         district_id: { type: string, example: ds-01 }
     Installation:
       type: object
-      required: [installation_id, inverter_id, substation_id, capacity_kw, latitude, longitude, commissioned_on, status]
+      required: [ installation_id, inverter_id, substation_id, capacity_kw, latitude, longitude, commissioned_on, status ]
       properties:
         installation_id: { type: string, readOnly: true, example: ins-0001 }
         inverter_id: { type: string, description: Serial of the site's reporting inverter (the meter identifier), example: INV-4AAE4E09 }
@@ -509,12 +594,12 @@ components:
         latitude: { type: number, minimum: 5.8, maximum: 10, example: 6.8603 }
         longitude: { type: number, minimum: 79.4, maximum: 82, example: 79.91942 }
         commissioned_on: { type: string, format: date, example: '2020-10-22' }
-        status: { type: string, enum: [active, maintenance], example: active }
+        status: { type: string, enum: [ active, maintenance ], example: active }
     InstallationComposite:
       allOf:
         - $ref: '#/components/schemas/Installation'
         - type: object
-          required: [location, last_reading]
+          required: [ location, last_reading ]
           properties:
             location:
               type: object
@@ -541,7 +626,7 @@ components:
     Reading:
       type: object
       description: One entry in an installation's append-only generation time series.
-      required: [reading_id, installation_id, recorded_at, power_kw, energy_kwh, voltage_v, received_at]
+      required: [ reading_id, installation_id, recorded_at, power_kw, energy_kwh, voltage_v, received_at ]
       properties:
         reading_id: { type: integer, readOnly: true, example: 865 }
         installation_id: { type: string, readOnly: true, example: ins-0001 }
@@ -578,8 +663,8 @@ components:
     Health:
       type: object
       properties:
-        status: { type: string, enum: [ok, degraded] }
-        database: { type: string, enum: [ok, unavailable] }
+        status: { type: string, enum: [ ok, degraded ] }
+        database: { type: string, enum: [ ok, unavailable ] }
         version: { type: string, example: 1.0.0 }
         uptime_seconds: { type: integer }
 
