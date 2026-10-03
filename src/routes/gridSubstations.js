@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { allowOnly } from '../middleware/allow.js';
+import { requireScope } from '../middleware/authenticate.js';
 import { ApiError } from '../lib/errors.js';
 import { parseQuery } from '../lib/validate.js';
 import { paginated, paginationParams } from '../lib/pagination.js';
@@ -21,7 +22,7 @@ const listQuery = z.strictObject({
 // GET /grid-substations: "grid-substations" is two words, so it is joined
 // with a hyphen (§5.1), never an underscore or camelCase.
 gridSubstationsRouter.route('/')
-  .get(async (req, res) => {
+  .get(requireScope('assets:read'), async (req, res) => {
     const query = parseQuery(listQuery, req);
     const { offset, limit } = query;
     const filters = await jurisdictionFiltersOf(req, query);
@@ -33,7 +34,7 @@ gridSubstationsRouter.route('/')
   .all(allowOnly('GET'));
 
 gridSubstationsRouter.route('/:substationId')
-  .get(async (req, res) => {
+  .get(requireScope('assets:read'), async (req, res) => {
     const { substationId } = req.params;
     const substation = await findGridSubstation(req.app.locals.db, substationId);
     if (!substation) throw new ApiError(40401, `Grid substation '${substationId}' was not found.`);

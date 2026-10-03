@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { allowOnly } from '../middleware/allow.js';
+import { requireScope } from '../middleware/authenticate.js';
 import { ApiError } from '../lib/errors.js';
 import { parseQuery } from '../lib/validate.js';
 import { paginated, paginationParams } from '../lib/pagination.js';
@@ -21,7 +22,7 @@ const listQuery = z.strictObject({
 // jurisdiction scope, and analysts browse districts nationally, so it is
 // not nested under /provinces (S3 scoping test: the global set is meaningful).
 districtsRouter.route('/')
-  .get(async (req, res) => {
+  .get(requireScope('assets:read'), async (req, res) => {
     const query = parseQuery(listQuery, req);
     const { offset, limit } = query;
     const filters = await jurisdictionFiltersOf(req, query);
@@ -33,7 +34,7 @@ districtsRouter.route('/')
   .all(allowOnly('GET'));
 
 districtsRouter.route('/:districtId')
-  .get(async (req, res) => {
+  .get(requireScope('assets:read'), async (req, res) => {
     const { districtId } = req.params;
     const district = await findDistrict(req.app.locals.db, districtId);
     if (!district) throw new ApiError(40401, `District '${districtId}' was not found.`);

@@ -3,6 +3,9 @@ info:
   title: SLSEA Real-Time Solar Generation Data API
   version: 1.0.0
   summary: Ingests and serves rooftop solar generation data for the Sri Lanka Sustainable Energy Authority.
+  license:
+    name: Proprietary (NB6007CEM coursework, all rights reserved)
+    identifier: LicenseRef-Coursework
   description: |
     REST API at the centre of SLSEA's national solar monitoring system (NB6007CEM coursework).
 
@@ -23,6 +26,8 @@ info:
 servers:
   - url: /solar/v1
     description: This deployment (versioned base path)
+security:
+  - bearerAuth: []
 tags:
   - name: Hierarchy
     description: Provinces, districts and grid substations (read only)
@@ -78,6 +83,55 @@ paths:
               schema: { $ref: '#/components/schemas/ErrorCatalogueEntry' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /oauth2/token:
+    servers:
+      - url: /
+    post:
+      tags: [ Auth ]
+      summary: Obtain a JWT bearer access token
+      description: |
+        Modelled on the OAuth 2.0 token endpoint (RFC 6749). Devices use `client_credentials` with their
+        installation id as `client_id` (credentials may also be sent as HTTP Basic). SLSEA users use the
+        `password` grant. A token is not a stored resource, so success is `200`. Failed attempts are
+        rate-limited per credential (10 per 15 minutes).
+      operationId: issueToken
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema: { $ref: '#/components/schemas/TokenRequest' }
+          application/json:
+            schema: { $ref: '#/components/schemas/TokenRequest' }
+            examples:
+              user:
+                summary: SLSEA user (password grant)
+                value: { grant_type: password, username: colombo.analyst, password: '<demo password>' }
+              device:
+                summary: Metering device (client credentials)
+                value: { grant_type: client_credentials, client_id: ins-0001, client_secret: '<device secret>' }
+      responses:
+        '200':
+          description: Access token issued.
+          headers:
+            Cache-Control:
+              description: Token responses are never cached.
+              schema: { type: string, example: no-store }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401':
+          description: Invalid client or user credentials.
+          headers:
+            WWW-Authenticate:
+              description: Challenge for client authentication.
+              schema: { type: string, example: 'Basic realm="slsea-oauth2"' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
   /provinces:
     get:
       tags: [ Hierarchy ]
@@ -100,7 +154,13 @@ paths:
               schema: { $ref: '#/components/schemas/ProvinceCollection' }
         '304': { $ref: '#/components/responses/NotModified' }
         '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '406': { $ref: '#/components/responses/NotAcceptable' }
+      security:
+        - oauth2:
+            - assets:read
+        - bearerAuth: []
   /provinces/{province-id}:
     parameters:
       - $ref: '#/components/parameters/ProvinceId'
@@ -119,11 +179,16 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Province' }
         '304': { $ref: '#/components/responses/NotModified' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
       parameters:
         - { $ref: '#/components/parameters/IfNoneMatch' }
         - { $ref: '#/components/parameters/IfModifiedSince' }
+      security:
+        - oauth2:
+            - assets:read
+        - bearerAuth: []
   /districts:
     get:
       tags: [ Hierarchy ]
@@ -147,6 +212,12 @@ paths:
               schema: { $ref: '#/components/schemas/DistrictCollection' }
         '304': { $ref: '#/components/responses/NotModified' }
         '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+      security:
+        - oauth2:
+            - assets:read
+        - bearerAuth: []
   /districts/{district-id}:
     parameters:
       - $ref: '#/components/parameters/DistrictId'
@@ -165,11 +236,16 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/District' }
         '304': { $ref: '#/components/responses/NotModified' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
       parameters:
         - { $ref: '#/components/parameters/IfNoneMatch' }
         - { $ref: '#/components/parameters/IfModifiedSince' }
+      security:
+        - oauth2:
+            - assets:read
+        - bearerAuth: []
   /grid-substations:
     get:
       tags: [ Hierarchy ]
@@ -194,6 +270,12 @@ paths:
               schema: { $ref: '#/components/schemas/GridSubstationCollection' }
         '304': { $ref: '#/components/responses/NotModified' }
         '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+      security:
+        - oauth2:
+            - assets:read
+        - bearerAuth: []
   /grid-substations/{substation-id}:
     parameters:
       - $ref: '#/components/parameters/SubstationId'
@@ -212,11 +294,16 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/GridSubstation' }
         '304': { $ref: '#/components/responses/NotModified' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
       parameters:
         - { $ref: '#/components/parameters/IfNoneMatch' }
         - { $ref: '#/components/parameters/IfModifiedSince' }
+      security:
+        - oauth2:
+            - assets:read
+        - bearerAuth: []
   /installations:
     get:
       tags: [ Installations ]
@@ -251,6 +338,12 @@ paths:
               schema: { $ref: '#/components/schemas/InstallationCollection' }
         '304': { $ref: '#/components/responses/NotModified' }
         '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+      security:
+        - oauth2:
+            - assets:read
+        - bearerAuth: []
   /installations/{installation-id}:
     parameters:
       - $ref: '#/components/parameters/InstallationId'
@@ -272,11 +365,17 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/InstallationComposite' }
         '304': { $ref: '#/components/responses/NotModified' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
       parameters:
         - { $ref: '#/components/parameters/IfNoneMatch' }
         - { $ref: '#/components/parameters/IfModifiedSince' }
+      security:
+        - oauth2:
+            - assets:read
+            - readings:read
+        - bearerAuth: []
   /installations/{installation-id}/last-reading:
     parameters:
       - $ref: '#/components/parameters/InstallationId'
@@ -298,11 +397,16 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Reading' }
         '304': { $ref: '#/components/responses/NotModified' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
       parameters:
         - { $ref: '#/components/parameters/IfNoneMatch' }
         - { $ref: '#/components/parameters/IfModifiedSince' }
+      security:
+        - oauth2:
+            - readings:read
+        - bearerAuth: []
   /installations/{installation-id}/readings:
     parameters:
       - $ref: '#/components/parameters/InstallationId'
@@ -331,8 +435,13 @@ paths:
               schema: { $ref: '#/components/schemas/ReadingCollection' }
         '304': { $ref: '#/components/responses/NotModified' }
         '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+      security:
+        - oauth2:
+            - readings:read
+        - bearerAuth: []
   /readings:
     get:
       tags: [ Readings ]
@@ -367,7 +476,12 @@ paths:
               schema: { $ref: '#/components/schemas/ReadingCollection' }
         '304': { $ref: '#/components/responses/NotModified' }
         '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+      security:
+        - oauth2:
+            - readings:read
+        - bearerAuth: []
   /installations/{installation-id}/readings/{reading-id}:
     parameters:
       - $ref: '#/components/parameters/InstallationId'
@@ -387,11 +501,16 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Reading' }
         '304': { $ref: '#/components/responses/NotModified' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
       parameters:
         - { $ref: '#/components/parameters/IfNoneMatch' }
         - { $ref: '#/components/parameters/IfModifiedSince' }
+      security:
+        - oauth2:
+            - readings:read
+        - bearerAuth: []
 
 components:
   parameters:
@@ -660,6 +779,24 @@ components:
         - $ref: '#/components/schemas/Page'
         - properties:
             items: { type: array, items: { $ref: '#/components/schemas/Installation' } }
+    TokenRequest:
+      type: object
+      required: [ grant_type ]
+      properties:
+        grant_type: { type: string, enum: [ client_credentials, password ] }
+        client_id: { type: string, description: Installation id (devices), example: ins-0001 }
+        client_secret: { type: string, description: Device secret (devices), writeOnly: true }
+        username: { type: string, description: SLSEA username (users), example: colombo.analyst }
+        password: { type: string, description: SLSEA password (users), writeOnly: true }
+        scope: { type: string, description: 'Optional space-separated subset of the scopes the client may hold', example: assets:read }
+    TokenResponse:
+      type: object
+      required: [ access_token, token_type, expires_in, scope ]
+      properties:
+        access_token: { type: string, description: 'JWT (HS256) carrying sub, role, scope and, for users, jurisdiction' }
+        token_type: { type: string, enum: [ Bearer ] }
+        expires_in: { type: integer, example: 3600 }
+        scope: { type: string, example: assets:read readings:read }
     Health:
       type: object
       properties:
@@ -693,6 +830,16 @@ components:
           schema: { $ref: '#/components/schemas/Error' }
     NotAcceptable:
       description: The Accept header excludes application/json.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    UnsupportedMediaType:
+      description: The request body is not in a media type this operation accepts.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    TooManyRequests:
+      description: Too many failed attempts for this credential; see the RateLimit headers.
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }

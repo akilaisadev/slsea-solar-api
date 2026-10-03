@@ -31,3 +31,23 @@ Every error response uses the same body (WSO2 §11):
   "errors": []
 }
 ```
+
+## Authentication
+
+Every resource under `/solar/v1` needs a JWT bearer token from `POST /oauth2/token`, or use the **Authorize** button in Swagger UI at `/docs`.
+
+| Client | Grant | Scopes | Jurisdiction |
+|---|---|---|---|
+| Metering device | `client_credentials` (`client_id` = installation id) | `readings:write` | its own installation only |
+| `national.analyst` | `password` | `assets:read readings:read` | whole country |
+| `western.analyst` | `password` | `assets:read readings:read` | Western Province |
+| `colombo.analyst` | `password` | `assets:read readings:read` | Colombo District |
+| `kandy.analyst` | `password` | `assets:read readings:read` | Kandy District |
+| `asset.admin` | `password` | `assets:read readings:read installations:write` | whole country |
+
+Demo credentials for the deployed instance are listed in the report appendix (they are seeded test accounts, not real users).
+
+```bash
+curl -X POST https://<host>/oauth2/token -d grant_type=password -d username=colombo.analyst -d password=<demo password>
+curl https://<host>/solar/v1/installations -H "Authorization: Bearer <access_token>"
+```

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { allowOnly } from '../middleware/allow.js';
+import { requireScope } from '../middleware/authenticate.js';
 import { ApiError } from '../lib/errors.js';
 import { parseQuery } from '../lib/validate.js';
 import { paginated, paginationParams } from '../lib/pagination.js';
@@ -30,7 +31,7 @@ function latest(...dates) {
 }
 
 installationsRouter.route('/')
-  .get(async (req, res) => {
+  .get(requireScope('assets:read'), async (req, res) => {
     const query = parseQuery(listQuery, req);
     const { offset, limit } = query;
     const filters = { ...await jurisdictionFiltersOf(req, query), status: query.status };
@@ -45,7 +46,8 @@ installationsRouter.route('/')
 
 // GET /installations/{installation-id}: composite (§4.3).
 installationsRouter.route('/:installationId')
-  .get(async (req, res) => {
+  // The composite embeds a reading, so it needs both read scopes.
+  .get(requireScope('assets:read'), requireScope('readings:read'), async (req, res) => {
     const installation = await loadInstallation(req);
     const lastReading = await findLastReading(req.app.locals.db, installation.installation_id);
     sendRepresentation(req, res, toInstallationComposite(installation, lastReading), {
@@ -59,7 +61,7 @@ installationsRouter.route('/:installationId')
 // like "last_power" is stored on the installation. Named with a noun
 // (§5.1), as the lecture notes do for /last-position.
 installationsRouter.route('/:installationId/last-reading')
-  .get(async (req, res) => {
+  .get(requireScope('readings:read'), async (req, res) => {
     const installation = await loadInstallation(req);
     const lastReading = await findLastReading(req.app.locals.db, installation.installation_id);
     if (!lastReading) {

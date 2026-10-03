@@ -8,6 +8,7 @@ export const ERROR_CATALOGUE = {
   40002: { status: 400, description: 'Invalid request body', resolution: 'Send every required field with the documented type and range; the errors array names each offending field.' },
   40003: { status: 400, description: 'Malformed JSON body', resolution: 'The request body could not be parsed as JSON. Validate the payload before sending.' },
   40004: { status: 400, description: 'Unsupported grant type', resolution: 'Use grant_type=client_credentials (devices) or grant_type=password (SLSEA users).' },
+  40005: { status: 400, description: 'Invalid scope', resolution: 'Request only scopes your client type may hold: readings:write for devices; assets:read, readings:read (and installations:write for asset administrators) for SLSEA users.' },
   40101: { status: 401, description: 'Missing bearer token', resolution: 'Obtain a token from POST /oauth2/token and send it as "Authorization: Bearer <token>".' },
   40102: { status: 401, description: 'Invalid or expired token', resolution: 'Request a new access token from POST /oauth2/token.' },
   40103: { status: 401, description: 'Invalid credentials', resolution: 'Check the client_id/client_secret (devices) or username/password (users).' },

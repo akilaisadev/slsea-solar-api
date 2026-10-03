@@ -6,8 +6,14 @@ import { ApiError } from './errors.js';
 // verified access token, so a client cannot widen it.
 export const NATIONAL = Object.freeze({ level: 'national' });
 
+// Fails closed: a request without a verified user jurisdiction (no token,
+// or a device token) is refused rather than defaulting to national scope.
 export function scopeOf(req) {
-  return req.auth?.scope ?? NATIONAL;
+  const jurisdiction = req.auth?.jurisdiction;
+  if (!jurisdiction) {
+    throw new ApiError(40301, 'Reading data requires an SLSEA user token with a jurisdiction.');
+  }
+  return jurisdiction;
 }
 
 // Restricts a query to the caller's jurisdiction.

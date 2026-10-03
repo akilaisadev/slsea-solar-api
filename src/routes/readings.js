@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { allowOnly } from '../middleware/allow.js';
+import { requireScope } from '../middleware/authenticate.js';
 import { parseQuery } from '../lib/validate.js';
 import { paginated, paginationParams } from '../lib/pagination.js';
 import { scopeOf } from '../lib/jurisdiction.js';
@@ -29,7 +30,7 @@ const listQuery = z.strictObject({
 });
 
 readingsRouter.route('/')
-  .get(async (req, res) => {
+  .get(requireScope('readings:read'), async (req, res) => {
     const query = parseQuery(listQuery, req);
     const { offset, limit } = query;
     const page = await listRegionalReadings(req.app.locals.db, {

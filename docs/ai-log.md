@@ -158,3 +158,25 @@ Each increment records the prompt I gave, what was generated, and what the revie
 | 3 | HTTP dates have one-second precision, but `updated_at`/`received_at` have milliseconds. Comparing them directly would make `If-Modified-Since: <the exact Last-Modified sent>` look "modified" and always return 200. | RFC 9110 §13.1.3 | Both sides are compared in whole seconds. Tested. |
 | 4 | Tag comparison rules differ: `If-None-Match` uses weak comparison (`W/"x"` matches `"x"`); `If-Match` must use strong comparison (weak tags never match). A single comparison function would get one of them wrong. | RFC 9110 §8.8.3 | Two functions (`weakMatch`, `strongMatch`); unit tests cover lists, `*` and `W/`. |
 | 5 | Express's built-in ETag was switched off in increment 1, so these validators are generated explicitly and can be explained line by line. | §10.4 | Confirmed: `app.set('etag', false)` remains; the ETag is a SHA-256 of the exact JSON bytes. |
+
+---
+
+## Increment 9: JWT bearer authentication, scopes and jurisdiction enforcement
+
+**Prompt context:** the approved plan §3 "Security"; brief §2 (the write-read split) and §10; rubric dimension 7 (JWT bearer with scopes, write path per installation, no cross-jurisdiction leakage); WSO2 §12; S7 and S8 notes on 401 versus 403 and `WWW-Authenticate`.
+
+**Generated:** `src/lib/tokens.js`, `src/middleware/authenticate.js` (`authenticate`, `requireScope`), `src/routes/oauth.js` (token endpoint with per-credential rate limiting), `src/repositories/principals.js`, scope checks on every route, token helpers in `test/helpers.js`, `test/auth.test.js` (15 security tests), and OpenAPI security requirements plus the token endpoint.
+
+**Review findings and fixes:**
+
+| # | Finding | Guideline | Fix |
+|---|---|---|---|
+| 1 | **Fail-open default.** `scopeOf()` returned NATIONAL when no jurisdiction was present (a placeholder from increment 5). Once auth exists, any request reaching a read handler without a user jurisdiction (for example a device token, if a scope check were ever missed) would have read the whole country. | §12, least privilege | `scopeOf()` now **fails closed**: no verified user jurisdiction means 403. |
+| 2 | **My own generator mistake:** the first version of the token endpoint compared unknown usernames against a hand-typed "bcrypt hash" constant that wasn't a valid hash. bcrypt can reject that instantly, so a response-time difference would reveal which usernames exist. | Security (user enumeration) | A real bcrypt hash of random bytes is computed once at startup and used for the comparison. |
+| 3 | Rate limiting by IP address would block the device simulator (one GitHub runner IP asking for 240 device tokens per run) while letting an attacker rotate IPs. | §12, availability | Failed attempts are limited **per credential** (10 per 15 min, successes not counted). A test confirms one locked credential doesn't affect another. |
+| 4 | **Inconsistency in the lecture notes:** S8 Layer 3 says wrong Basic credentials should return **403**, while S7 (and RFC 9110 / RFC 6750) say **401**: 403 is only for a known identity without permission. | §9, RFC 9110 §15.5.2–4 | Followed S7 and the RFCs: missing or invalid credentials → 401 with `WWW-Authenticate`; valid token without scope or outside jurisdiction → 403. |
+| 5 | A JWT library will accept whatever algorithm the token's header names unless it's pinned (the "alg: none" and algorithm-confusion attacks). | §12.2 | HS256 is pinned on sign and verify, with `iss`, `aud` and `exp` checked. Tests reject wrong-key, expired, wrong-audience, `alg: none` and garbage tokens. |
+| 6 | Generators often return **201** from a token endpoint. A token isn't a stored, addressable resource and RFC 6749 §5.1 specifies 200 with `Cache-Control: no-store`. | §9, RFC 6749 | 200 with `no-store` and `Pragma: no-cache`. |
+| 7 | Swagger UI's client-credentials flow sends credentials as HTTP Basic, which the first version ignored. | RFC 6749 §2.3.1 | The token endpoint accepts client credentials in the body or as Basic. Tested both ways. |
+
+**Scope design (report material):** scopes express *what* a client may do (`readings:write`, `assets:read`, `readings:read`, `installations:write`); *where* a user may read is a signed `jurisdiction` claim enforced in every SQL query. The alternative, one scope per jurisdiction (`read:district:ds-01`, ...), would need 35+ scopes and still couldn't express "this district's province name". The claim-plus-query approach is effectively attribute-based access control (WSO2 §12.3) without a separate XACML policy engine.

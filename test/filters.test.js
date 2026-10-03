@@ -1,9 +1,12 @@
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import request from 'supertest';
-import { app, db, assertErrorBody } from './helpers.js';
+import { db, assertErrorBody, as, userToken } from './helpers.js';
 
 after(() => db.end());
+
+// A national analyst sees every jurisdiction, so these tests exercise the
+// resources themselves; jurisdiction limits are tested in auth.test.js.
+const national = as(await userToken('national.analyst'));
 
 const BASE = '/solar/v1';
 
@@ -25,25 +28,25 @@ async function installationsInDistrict(districtId) {
 
 test('installations can be filtered by district (jurisdiction filter)', async () => {
   const expected = await installationsInDistrict('ds-01');
-  const res = await request(app).get(`${BASE}/installations?district-id=ds-01&limit=500`);
+  const res = await national.get(`${BASE}/installations?district-id=ds-01&limit=500`);
   assert.equal(res.status, 200);
   assert.equal(res.body.count, expected.size);
   assert.ok(res.body.items.every((i) => expected.has(i.installation_id)));
 });
 
 test('installations can be filtered by province and by status', async () => {
-  const western = await request(app).get(`${BASE}/installations?province-id=pv-01&limit=500`);
+  const western = await national.get(`${BASE}/installations?province-id=pv-01&limit=500`);
   const westernDistricts = await Promise.all(['ds-01', 'ds-02', 'ds-03'].map(installationsInDistrict));
   assert.equal(western.body.count, westernDistricts.reduce((n, s) => n + s.size, 0));
 
-  const maintenance = await request(app).get(`${BASE}/installations?status=maintenance`);
+  const maintenance = await national.get(`${BASE}/installations?status=maintenance`);
   assert.equal(maintenance.body.count, 3);
   assert.ok(maintenance.body.items.every((i) => i.status === 'maintenance'));
 });
 
 test('installations sort by capacity in both directions', async () => {
-  const asc = await request(app).get(`${BASE}/installations?sort=capacity_kw&order=asc&limit=500`);
-  const desc = await request(app).get(`${BASE}/installations?sort=capacity_kw&order=desc&limit=500`);
+  const asc = await national.get(`${BASE}/installations?sort=capacity_kw&order=asc&limit=500`);
+  const desc = await national.get(`${BASE}/installations?sort=capacity_kw&order=desc&limit=500`);
   const a = asc.body.items.map((i) => i.capacity_kw);
   const d = desc.body.items.map((i) => i.capacity_kw);
   assert.deepEqual(a, [...a].sort((x, y) => x - y));
@@ -54,7 +57,7 @@ test('readings filter by time window: from inclusive, to exclusive', async () =>
   const newest = await newestReadingTime();
   const to = new Date(newest.getTime() - 60 * 60 * 1000);
   const from = new Date(to.getTime() - 60 * 60 * 1000);
-  const res = await request(app)
+  const res = await national
     .get(`${BASE}/installations/ins-0001/readings`)
     .query({ from: from.toISOString(), to: to.toISOString(), order: 'asc' });
   assert.equal(res.status, 200);
@@ -64,8 +67,8 @@ test('readings filter by time window: from inclusive, to exclusive', async () =>
 });
 
 test('readings sort by timestamp ascending and descending', async () => {
-  const asc = await request(app).get(`${BASE}/installations/ins-0001/readings?order=asc&limit=20`);
-  const desc = await request(app).get(`${BASE}/installations/ins-0001/readings?order=desc&limit=20`);
+  const asc = await national.get(`${BASE}/installations/ins-0001/readings?order=asc&limit=20`);
+  const desc = await national.get(`${BASE}/installations/ins-0001/readings?order=desc&limit=20`);
   const a = asc.body.items.map((r) => Date.parse(r.recorded_at));
   const d = desc.body.items.map((r) => Date.parse(r.recorded_at));
   assert.deepEqual(a, [...a].sort((x, y) => x - y));
@@ -82,7 +85,7 @@ test('the regional /readings view filters by district and time window', async ()
      JOIN grid_substation s USING (substation_id) WHERE s.district_id = 'ds-01' AND r.recorded_at >= $1`,
     [from],
   );
-  const res = await request(app).get(`${BASE}/readings`).query({ 'district-id': 'ds-01', from: from.toISOString(), limit: 500 });
+  const res = await national.get(`${BASE}/readings`).query({ 'district-id': 'ds-01', from: from.toISOString(), limit: 500 });
   assert.equal(res.status, 200);
   assert.equal(res.body.count, rows[0].count);
   assert.ok(res.body.items.every((r) => inColombo.has(r.installation_id)));
@@ -99,7 +102,7 @@ test('pagination stays stable when many rows tie on the sort key', async () => {
   const seen = new Set();
   let count;
   while (url) {
-    const page = await request(app).get(url.replace(/^https?:\/\/[^/]+/, ''));
+    const page = await national.get(url.replace(/^https?:\/\/[^/]+/, ''));
     count = page.body.count;
     for (const r of page.body.items) {
       assert.equal(r.power_kw, 0);
@@ -123,7 +126,7 @@ test('invalid filters are rejected with 400', async () => {
     '/installations?limit=10&limit=20', // repeated parameter
   ];
   for (const path of cases) {
-    const res = await request(app).get(`${BASE}${path}`);
+    const res = await national.get(`${BASE}${path}`);
     assertErrorBody(res, 400, 40001);
   }
 });

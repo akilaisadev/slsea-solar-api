@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { allowOnly } from '../middleware/allow.js';
+import { requireScope } from '../middleware/authenticate.js';
 import { ApiError } from '../lib/errors.js';
 import { parseQuery } from '../lib/validate.js';
 import { paginated, paginationParams } from '../lib/pagination.js';
@@ -23,7 +24,7 @@ const listQuery = z.strictObject({
 });
 
 installationReadingsRouter.route('/')
-  .get(async (req, res) => {
+  .get(requireScope('readings:read'), async (req, res) => {
     const installation = await loadInstallation(req);
     const query = parseQuery(listQuery, req);
     const { offset, limit } = query;
@@ -43,7 +44,7 @@ installationReadingsRouter.route('/')
 
 // One reading: the URI a 201 Location header points to after ingestion.
 installationReadingsRouter.route('/:readingId')
-  .get(async (req, res) => {
+  .get(requireScope('readings:read'), async (req, res) => {
     const installation = await loadInstallation(req);
     const { readingId } = req.params;
     // A non-numeric id cannot name a reading; answer 404 rather than let
