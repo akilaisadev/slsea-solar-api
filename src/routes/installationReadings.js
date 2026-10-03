@@ -8,20 +8,32 @@ import { sendRepresentation } from '../lib/respond.js';
 import { listInstallationReadings, findReading } from '../repositories/readings.js';
 import { toReading } from '../representations.js';
 import { loadInstallation } from './loaders.js';
+import { timeWindowParams, timeWindowOf, order } from './queryParams.js';
 
 // /installations/{installation-id}/readings: a scoped collection (§4.6,
 // §5.6). A reading has no meaning without its installation, so the parent
 // is part of the path rather than a query-string filter.
 export const installationReadingsRouter = Router({ mergeParams: true });
 
-const listQuery = z.strictObject({ ...paginationParams });
+const listQuery = z.strictObject({
+  ...paginationParams,
+  ...timeWindowParams,
+  sort: z.enum(['recorded_at', 'power_kw']).default('recorded_at'),
+  order: order('desc'),
+});
 
 installationReadingsRouter.route('/')
   .get(async (req, res) => {
     const installation = await loadInstallation(req);
-    const { offset, limit } = parseQuery(listQuery, req);
+    const query = parseQuery(listQuery, req);
+    const { offset, limit } = query;
     const page = await listInstallationReadings(req.app.locals.db, {
-      installationId: installation.installation_id, offset, limit,
+      installationId: installation.installation_id,
+      window: timeWindowOf(query),
+      sort: query.sort,
+      order: query.order,
+      offset,
+      limit,
     });
     sendRepresentation(req, res, paginated(req, { count: page.count, offset, limit, items: page.rows.map(toReading) }), {
       lastModified: page.lastModified,

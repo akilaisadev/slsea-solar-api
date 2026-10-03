@@ -120,3 +120,23 @@ Each increment records the prompt I gave, what was generated, and what the revie
 | 3 | The composite changes when either the installation or its latest reading changes. Using only `installation.updated_at` as `Last-Modified` would let `If-Modified-Since` return a false "not modified" after a new reading arrived. | §8.2, §10.4 | `Last-Modified` is the later of `installation.updated_at` and `last_reading.received_at`. |
 | 4 | S6 composite checklist: newest reading chosen by `ORDER BY recorded_at DESC` (not array order or ascending); `last_reading` is a nested object, not `last_power`/`last_*` flat fields; no history array embedded; `last-reading` named with a hyphenated noun. | §4.3, §4.5, §5.1 | Verified, with tests comparing against the database's newest row. |
 | 5 | A reading lookup by ID alone would let `/installations/A/readings/{id of B's reading}` return B's data. | §4.6 scoping | The lookup is by (installation_id, reading_id). A test confirms the cross-parent read is 404. |
+
+---
+
+## Increment 7: Filtering, sorting, time windows and the regional readings view
+
+**Prompt context:** the approved plan, increment 7, and brief §5 "Advanced behaviour": filtering by jurisdiction (province, district, substation) and by time window, sorting by timestamp both ways, and pagination over readings. WSO2 §5.7 and §10.2–10.3.
+
+**Generated:** `src/routes/{queryParams,readings}.js`, filter and sort support in the repositories and list routes, `test/filters.test.js`, and OpenAPI parameters plus the `/readings` path.
+
+**Design decision to defend:** `GET /readings` is a read-only regional view across installations. The S3/S4 notes call a global `/pings` a generator mistake because no police client needs every ping. Here the brief's analytical scope ("how generation has behaved over time, by region") is exactly that client need, so the §4 "clients win over data" test is met. Creation stays only in the scoped factory `/installations/{installation-id}/readings`, and results are always clipped to the caller's jurisdiction.
+
+**Review findings and fixes:**
+
+| # | Finding | Guideline | Fix |
+|---|---|---|---|
+| 1 | Offset pagination sorted only by `recorded_at` or `power_kw` has no total order: many sites report at the same instant, and every site reads 0 kW overnight. SQL gives no guarantee about the order of tied rows between two queries, so a row could be skipped or repeated across pages. | §10.3 correctness | Every sort appends the unique `reading_id` (installations: `installation_id`) as a tie-breaker. **Honest note:** I removed the tie-breaker temporarily, and the page-walk test still passed on this dataset, because PostgreSQL happened to return ties in a consistent order. The test documents the contract; it doesn't prove failure without the fix. |
+| 2 | An explicit filter outside the caller's jurisdiction (a Colombo user asking for `?district-id=ds-04`) would only return an empty page, because the scope clause is ANDed. That doesn't leak data, but it hides the refusal. | §12, brief §10 | `jurisdictionFiltersOf()` resolves the filter's place in the hierarchy and returns **403** when it's outside the caller's jurisdiction. (Fully tested with tokens in increment 9.) |
+| 3 | A time window with `from >= to`, or a non-ISO value like `from=yesterday`, would either error in SQL or silently return nothing. | §9 (400) | Validated as ISO 8601 with an offset; an empty window gets 400 with the field named. `from` is inclusive and `to` exclusive, so consecutive windows never double-count. |
+| 4 | Sort keys could be passed straight into `ORDER BY` (SQL injection). | Security | Sort keys are an enum mapped through a fixed column whitelist (`SORT_COLUMNS`); the direction comes from an enum. |
+| 5 | Measured cost: national unfiltered `/readings` (about 206k rows, with a count) takes 0.35–0.5 s locally; a single installation's history takes about 6 ms. | Performance | Acceptable at this scale. Recorded as a limitation for the critical evaluation (offset pagination plus `count(*)` versus keyset/cursor pagination). |

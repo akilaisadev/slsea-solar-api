@@ -8,17 +8,24 @@ import { scopeOf, assertInScope } from '../lib/jurisdiction.js';
 import { sendRepresentation } from '../lib/respond.js';
 import { listGridSubstations, findGridSubstation } from '../repositories/hierarchy.js';
 import { toGridSubstation } from '../representations.js';
+import { jurisdictionParams, jurisdictionFiltersOf } from './queryParams.js';
 
 export const gridSubstationsRouter = Router();
 
-const listQuery = z.strictObject({ ...paginationParams });
+const listQuery = z.strictObject({
+  ...paginationParams,
+  'province-id': jurisdictionParams['province-id'],
+  'district-id': jurisdictionParams['district-id'],
+});
 
 // GET /grid-substations: "grid-substations" is two words, so it is joined
 // with a hyphen (§5.1), never an underscore or camelCase.
 gridSubstationsRouter.route('/')
   .get(async (req, res) => {
-    const { offset, limit } = parseQuery(listQuery, req);
-    const page = await listGridSubstations(req.app.locals.db, { scope: scopeOf(req), offset, limit });
+    const query = parseQuery(listQuery, req);
+    const { offset, limit } = query;
+    const filters = await jurisdictionFiltersOf(req, query);
+    const page = await listGridSubstations(req.app.locals.db, { scope: scopeOf(req), filters, offset, limit });
     sendRepresentation(req, res, paginated(req, { count: page.count, offset, limit, items: page.rows.map(toGridSubstation) }), {
       lastModified: page.lastModified,
     });

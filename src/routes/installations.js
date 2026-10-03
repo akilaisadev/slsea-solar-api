@@ -11,10 +11,17 @@ import { findLastReading } from '../repositories/readings.js';
 import { toInstallation, toInstallationComposite, toReading } from '../representations.js';
 import { installationReadingsRouter } from './installationReadings.js';
 import { loadInstallation } from './loaders.js';
+import { jurisdictionParams, jurisdictionFiltersOf, order } from './queryParams.js';
 
 export const installationsRouter = Router();
 
-const listQuery = z.strictObject({ ...paginationParams });
+const listQuery = z.strictObject({
+  ...paginationParams,
+  ...jurisdictionParams,
+  status: z.enum(['active', 'maintenance']).optional(),
+  sort: z.enum(['installation_id', 'capacity_kw', 'commissioned_on']).default('installation_id'),
+  order: order('asc'),
+});
 
 // The later of two change times: the composite changes when either the
 // installation or its latest reading changes.
@@ -24,8 +31,12 @@ function latest(...dates) {
 
 installationsRouter.route('/')
   .get(async (req, res) => {
-    const { offset, limit } = parseQuery(listQuery, req);
-    const page = await listInstallations(req.app.locals.db, { scope: scopeOf(req), offset, limit });
+    const query = parseQuery(listQuery, req);
+    const { offset, limit } = query;
+    const filters = { ...await jurisdictionFiltersOf(req, query), status: query.status };
+    const page = await listInstallations(req.app.locals.db, {
+      scope: scopeOf(req), filters, sort: query.sort, order: query.order, offset, limit,
+    });
     sendRepresentation(req, res, paginated(req, { count: page.count, offset, limit, items: page.rows.map(toInstallation) }), {
       lastModified: page.lastModified,
     });

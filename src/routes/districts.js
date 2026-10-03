@@ -8,18 +8,24 @@ import { scopeOf, assertInScope } from '../lib/jurisdiction.js';
 import { sendRepresentation } from '../lib/respond.js';
 import { listDistricts, findDistrict } from '../repositories/hierarchy.js';
 import { toDistrict } from '../representations.js';
+import { jurisdictionParams, jurisdictionFiltersOf } from './queryParams.js';
 
 export const districtsRouter = Router();
 
-const listQuery = z.strictObject({ ...paginationParams });
+const listQuery = z.strictObject({
+  ...paginationParams,
+  'province-id': jurisdictionParams['province-id'],
+});
 
 // GET /districts: first-class collection. District is the mid-level
 // jurisdiction scope, and analysts browse districts nationally, so it is
 // not nested under /provinces (S3 scoping test: the global set is meaningful).
 districtsRouter.route('/')
   .get(async (req, res) => {
-    const { offset, limit } = parseQuery(listQuery, req);
-    const page = await listDistricts(req.app.locals.db, { scope: scopeOf(req), offset, limit });
+    const query = parseQuery(listQuery, req);
+    const { offset, limit } = query;
+    const filters = await jurisdictionFiltersOf(req, query);
+    const page = await listDistricts(req.app.locals.db, { scope: scopeOf(req), filters, offset, limit });
     sendRepresentation(req, res, paginated(req, { count: page.count, offset, limit, items: page.rows.map(toDistrict) }), {
       lastModified: page.lastModified,
     });

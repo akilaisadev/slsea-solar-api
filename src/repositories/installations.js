@@ -9,9 +9,14 @@ const FROM_INSTALLATIONS = `solar_installation i
   JOIN grid_substation s ON s.substation_id = i.substation_id
   JOIN district d ON d.district_id = s.district_id`;
 
+// Client sort keys map onto fixed SQL columns; installation_id is appended
+// as a unique tie-breaker so equal capacities paginate deterministically.
+const SORT_COLUMNS = { installation_id: 'i.installation_id', capacity_kw: 'i.capacity_kw', commissioned_on: 'i.commissioned_on' };
+
 // Decommissioned installations have left the API (DELETE is a soft delete
 // that keeps their readings), so every query excludes them.
-export function listInstallations(db, { scope, filters = {}, offset, limit }) {
+export function listInstallations(db, { scope, filters = {}, sort = 'installation_id', order = 'asc', offset, limit }) {
+  const direction = order === 'desc' ? 'DESC' : 'ASC';
   const conditions = new Conditions();
   conditions.addFixed(`i.status <> 'decommissioned'`);
   restrictToScope(conditions, scope, { province: 'd.province_id', district: 'd.district_id' });
@@ -23,7 +28,7 @@ export function listInstallations(db, { scope, filters = {}, offset, limit }) {
     select: INSTALLATION_COLUMNS,
     from: FROM_INSTALLATIONS,
     conditions,
-    orderBy: 'i.installation_id',
+    orderBy: `${SORT_COLUMNS[sort]} ${direction}, i.installation_id ${direction}`,
     offset,
     limit,
     // Any change to any installation (including a decommission, which
