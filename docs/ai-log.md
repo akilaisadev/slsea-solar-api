@@ -83,3 +83,22 @@ Each increment records the prompt I gave, what was generated, and what the revie
 | 1 | `swagger-ui-express` pulls in `@scarf/scarf`, which runs an install-time analytics script. npm 12 blocked it with a warning. | Supply-chain hygiene | Denied it explicitly (`allowScripts: {"@scarf/scarf": false}` in `package.json`), so no telemetry runs in local or Render builds. |
 | 2 | The global JSON-only `Accept` rule (406) would also apply to Swagger UI, which browsers request as `text/html`. | §10.1 vs. usability | Mounted the docs router before the negotiation middleware. A test checks that `/docs/` returns HTML. |
 | 3 | helmet's default Content-Security-Policy can break Swagger UI. | Security headers | Checked in the browser: Swagger UI loads with no console errors, so the default CSP stays as is. |
+
+---
+
+## Increment 5: Hierarchy and installation read endpoints
+
+**Prompt context:** the approved plan, increment 5: collections and atomic resources for provinces, districts, grid substations and installations; snake_case representations; member 404s; the §10.3 paginated collection shape; jurisdiction scoping built into every query before auth exists.
+
+**Generated:** `src/routes/{api,provinces,districts,gridSubstations,installations}.js`, `src/repositories/{page,hierarchy,installations}.js`, `src/representations.js`, `src/lib/{validate,pagination,sql,jurisdiction,respond}.js`, `test/{hierarchy,jurisdiction}.test.js`, and OpenAPI paths and schemas.
+
+**Review findings and fixes:**
+
+| # | Finding | Guideline | Fix |
+|---|---|---|---|
+| 1 | node-postgres converts a SQL `DATE` into a JavaScript `Date` at local midnight. On a UTC+05:30 machine, `commissioned_on = 2023-04-02` would have serialised as `"2023-04-01T18:30:00.000Z"`: the wrong day, plus a time the field doesn't have. | §6 representation | Added a type parser that keeps DATE as a `YYYY-MM-DD` string. A test asserts the format. |
+| 2 | **Redocly lint found broken OpenAPI.** Unquoted descriptions containing commas inside YAML flow mappings (`{ ... }`) were parsed as extra keys (e.g. `stable description of the error code`), so the published schema was wrong. | Documentation accuracy | Quoted those descriptions. Lint now reports only the expected `security-defined` errors, which increment 9 resolves. |
+| 3 | A collection's `Last-Modified` computed as `max(updated_at)` over the *visible* rows wouldn't move when an installation is decommissioned, because the row leaves the set. A client using `If-Modified-Since` would then get a false 304 for a list that had changed. | §10.4 correctness | The installations list uses the table-wide `max(updated_at)`. It's coarser, but it can never claim "not modified" wrongly. |
+| 4 | With default (non-strict) schemas, unknown query parameters such as `?district_id=` (underscore typo) would be silently ignored and return unfiltered data. | §5.7, client feedback | All query schemas are strict: unknown parameters get 400 and are named in `errors[]`. |
+| 5 | The installation query pushed a raw string straight into `conditions.clauses`, bypassing the `Conditions` API that guarantees client values are bound parameters. | SQL-injection hygiene | Added `addFixed()` for constant conditions; every client value goes through `add()`/`bind()`. |
+| 6 | S3 and S4 generator-mistake checklist: plural lowercase hyphenated collections (`/grid-substations`), no verbs, `{province-id}` URI-template variables in the spec, no global `/readings` yet, and seed data read from the database rather than per request. | §5.1, §5.6 | Verified. |

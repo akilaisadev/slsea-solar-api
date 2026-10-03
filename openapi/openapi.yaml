@@ -78,7 +78,177 @@ paths:
               schema: { $ref: '#/components/schemas/ErrorCatalogueEntry' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /provinces:
+    get:
+      tags: [Hierarchy]
+      summary: List provinces (collection)
+      operationId: listProvinces
+      parameters:
+        - $ref: '#/components/parameters/Offset'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: A page of provinces within the caller's jurisdiction.
+          headers:
+            Last-Modified: { $ref: '#/components/headers/Last-Modified' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProvinceCollection' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '406': { $ref: '#/components/responses/NotAcceptable' }
+  /provinces/{province-id}:
+    parameters:
+      - $ref: '#/components/parameters/ProvinceId'
+    get:
+      tags: [Hierarchy]
+      summary: Get one province (atomic)
+      operationId: getProvince
+      responses:
+        '200':
+          description: The province.
+          headers:
+            Last-Modified: { $ref: '#/components/headers/Last-Modified' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Province' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /districts:
+    get:
+      tags: [Hierarchy]
+      summary: List districts (collection)
+      operationId: listDistricts
+      parameters:
+        - $ref: '#/components/parameters/Offset'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: A page of districts within the caller's jurisdiction.
+          headers:
+            Last-Modified: { $ref: '#/components/headers/Last-Modified' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DistrictCollection' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+  /districts/{district-id}:
+    parameters:
+      - $ref: '#/components/parameters/DistrictId'
+    get:
+      tags: [Hierarchy]
+      summary: Get one district (atomic)
+      operationId: getDistrict
+      responses:
+        '200':
+          description: The district.
+          headers:
+            Last-Modified: { $ref: '#/components/headers/Last-Modified' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/District' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /grid-substations:
+    get:
+      tags: [Hierarchy]
+      summary: List grid substations (collection)
+      operationId: listGridSubstations
+      parameters:
+        - $ref: '#/components/parameters/Offset'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: A page of grid substations within the caller's jurisdiction.
+          headers:
+            Last-Modified: { $ref: '#/components/headers/Last-Modified' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GridSubstationCollection' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+  /grid-substations/{substation-id}:
+    parameters:
+      - $ref: '#/components/parameters/SubstationId'
+    get:
+      tags: [Hierarchy]
+      summary: Get one grid substation (atomic)
+      operationId: getGridSubstation
+      responses:
+        '200':
+          description: The grid substation.
+          headers:
+            Last-Modified: { $ref: '#/components/headers/Last-Modified' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GridSubstation' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /installations:
+    get:
+      tags: [Installations]
+      summary: List installations (collection)
+      operationId: listInstallations
+      parameters:
+        - $ref: '#/components/parameters/Offset'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: A page of active and under-maintenance installations within the caller's jurisdiction.
+          headers:
+            Last-Modified: { $ref: '#/components/headers/Last-Modified' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InstallationCollection' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+  /installations/{installation-id}:
+    parameters:
+      - $ref: '#/components/parameters/InstallationId'
+    get:
+      tags: [Installations]
+      summary: Get one installation
+      operationId: getInstallation
+      responses:
+        '200':
+          description: The installation.
+          headers:
+            Last-Modified: { $ref: '#/components/headers/Last-Modified' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Installation' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
 components:
+  parameters:
+    Offset:
+      name: offset
+      in: query
+      description: Zero-based position of the first item to return.
+      schema: { type: integer, minimum: 0, default: 0 }
+    Limit:
+      name: limit
+      in: query
+      description: Maximum number of items to return.
+      schema: { type: integer, minimum: 1, maximum: 500, default: 50 }
+    ProvinceId:
+      name: province-id
+      in: path
+      required: true
+      schema: { type: string, pattern: '^pv-[0-9]{2}$', example: pv-01 }
+    DistrictId:
+      name: district-id
+      in: path
+      required: true
+      schema: { type: string, pattern: '^ds-[0-9]{2}$', example: ds-01 }
+    SubstationId:
+      name: substation-id
+      in: path
+      required: true
+      schema: { type: string, pattern: '^gss-[0-9]{3}$', example: gss-001 }
+    InstallationId:
+      name: installation-id
+      in: path
+      required: true
+      schema: { type: string, pattern: '^ins-[0-9]{4,}$', example: ins-0001 }
+
   securitySchemes:
     bearerAuth:
       type: http
@@ -127,7 +297,7 @@ components:
       properties:
         code: { type: integer, description: Product-specific error code (HTTP status x 100 + sequence), example: 40401 }
         message: { type: string, description: What went wrong with this request, example: "Installation 'ins-9999' was not found." }
-        description: { type: string, description: Short, stable description of the error code, example: Resource not found }
+        description: { type: string, description: 'Short, stable description of the error code', example: Resource not found }
         more_info: { type: string, format: uri, description: Link to the catalogue entry for this code }
         errors:
           type: array
@@ -147,6 +317,69 @@ components:
         http_status: { type: integer, example: 404 }
         description: { type: string }
         resolution: { type: string }
+    Page:
+      type: object
+      description: Paginated collection shape (WSO2 §10.3).
+      required: [count, offset, limit, next, previous, items]
+      properties:
+        count: { type: integer, description: Total number of items matching the query (all pages), example: 25 }
+        offset: { type: integer, example: 0 }
+        limit: { type: integer, example: 50 }
+        next: { type: [string, 'null'], format: uri, description: 'Absolute URL of the next page, or null on the last page' }
+        previous: { type: [string, 'null'], format: uri, description: 'Absolute URL of the previous page, or null on the first page' }
+        items: { type: array, items: {} }
+    Province:
+      type: object
+      required: [province_id, name]
+      properties:
+        province_id: { type: string, example: pv-01 }
+        name: { type: string, example: Western }
+    District:
+      type: object
+      required: [district_id, name, province_id]
+      properties:
+        district_id: { type: string, example: ds-01 }
+        name: { type: string, example: Colombo }
+        province_id: { type: string, example: pv-01 }
+    GridSubstation:
+      type: object
+      required: [substation_id, name, district_id]
+      properties:
+        substation_id: { type: string, example: gss-001 }
+        name: { type: string, example: Kolonnawa Grid Substation }
+        district_id: { type: string, example: ds-01 }
+    Installation:
+      type: object
+      required: [installation_id, inverter_id, substation_id, capacity_kw, latitude, longitude, commissioned_on, status]
+      properties:
+        installation_id: { type: string, readOnly: true, example: ins-0001 }
+        inverter_id: { type: string, description: Serial of the site's reporting inverter (the meter identifier), example: INV-4AAE4E09 }
+        substation_id: { type: string, example: gss-001 }
+        capacity_kw: { type: number, exclusiveMinimum: 0, maximum: 500, example: 5 }
+        latitude: { type: number, minimum: 5.8, maximum: 10, example: 6.8603 }
+        longitude: { type: number, minimum: 79.4, maximum: 82, example: 79.91942 }
+        commissioned_on: { type: string, format: date, example: '2020-10-22' }
+        status: { type: string, enum: [active, maintenance], example: active }
+    ProvinceCollection:
+      allOf:
+        - $ref: '#/components/schemas/Page'
+        - properties:
+            items: { type: array, items: { $ref: '#/components/schemas/Province' } }
+    DistrictCollection:
+      allOf:
+        - $ref: '#/components/schemas/Page'
+        - properties:
+            items: { type: array, items: { $ref: '#/components/schemas/District' } }
+    GridSubstationCollection:
+      allOf:
+        - $ref: '#/components/schemas/Page'
+        - properties:
+            items: { type: array, items: { $ref: '#/components/schemas/GridSubstation' } }
+    InstallationCollection:
+      allOf:
+        - $ref: '#/components/schemas/Page'
+        - properties:
+            items: { type: array, items: { $ref: '#/components/schemas/Installation' } }
     Health:
       type: object
       properties:

@@ -7,6 +7,7 @@ import { notFound, errorHandler } from './middleware/errorHandler.js';
 import { healthRouter } from './routes/health.js';
 import { errorsRouter } from './routes/errors.js';
 import { docsRouter } from './routes/docs.js';
+import { apiRouter } from './routes/api.js';
 import { absoluteUrl } from './lib/urls.js';
 
 export function createApp({ db }) {
@@ -43,6 +44,7 @@ export function createApp({ db }) {
 
   app.use('/health', healthRouter);
   app.use('/errors', errorsRouter);
+  app.use(config.basePath, apiRouter);
 
   app.use(notFound);
   app.use(errorHandler);
