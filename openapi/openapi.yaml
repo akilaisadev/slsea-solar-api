@@ -247,6 +247,47 @@ paths:
         - oauth2:
             - assets:read
         - bearerAuth: []
+  /districts/{district-id}/generation-summary:
+    parameters:
+      - $ref: '#/components/parameters/DistrictId'
+    get:
+      tags: [ Analytics ]
+      summary: District generation summary (operational dashboard view)
+      description: |
+        Processing-function resource (WSO2 §4.5), computed on every request across all registered
+        installations in the district:
+        - `current_total_power_kw`: sum of each site's latest power, counting only sites that reported
+          within the last `reporting_window_minutes`. Always describes now.
+        - `total_energy_kwh`: energy generated on `date` (Asia/Colombo calendar day, default today),
+          derived from each inverter's cumulative counter: last value in the day minus the last value
+          before it.
+      operationId: getDistrictGenerationSummary
+      parameters:
+        - name: date
+          in: query
+          description: Calendar day (Asia/Colombo) for total_energy_kwh; defaults to today; not in the future.
+          schema: { type: string, format: date, example: '2026-10-02' }
+        - $ref: '#/components/parameters/IfNoneMatch'
+        - $ref: '#/components/parameters/IfModifiedSince'
+      responses:
+        '200':
+          description: The summary.
+          headers:
+            Last-Modified: { $ref: '#/components/headers/Last-Modified' }
+            ETag: { $ref: '#/components/headers/ETag' }
+            Cache-Control: { $ref: '#/components/headers/Cache-Control' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GenerationSummary' }
+        '304': { $ref: '#/components/responses/NotModified' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+      security:
+        - oauth2:
+            - readings:read
+        - bearerAuth: []
   /grid-substations:
     get:
       tags: [ Hierarchy ]
@@ -952,6 +993,22 @@ components:
         - $ref: '#/components/schemas/Page'
         - properties:
             items: { type: array, items: { $ref: '#/components/schemas/Installation' } }
+    GenerationSummary:
+      type: object
+      required: [ district_id, district_name, installation_count, installed_capacity_kw, reporting_installation_count,
+        reporting_window_minutes, current_total_power_kw, as_of, date, timezone, total_energy_kwh ]
+      properties:
+        district_id: { type: string, example: ds-01 }
+        district_name: { type: string, example: Colombo }
+        installation_count: { type: integer, description: Registered (not decommissioned) installations, example: 31 }
+        installed_capacity_kw: { type: number, example: 303 }
+        reporting_installation_count: { type: integer, description: Installations whose latest reading is within the reporting window, example: 30 }
+        reporting_window_minutes: { type: integer, example: 60 }
+        current_total_power_kw: { type: number, example: 107.096 }
+        as_of: { type: [ string, 'null' ], format: date-time, description: Newest reading counted in the current total }
+        date: { type: string, format: date, example: '2026-10-02' }
+        timezone: { type: string, example: Asia/Colombo }
+        total_energy_kwh: { type: number, description: Energy generated in the district on `date`, example: 1205.709 }
     ReadingInput:
       type: object
       additionalProperties: false

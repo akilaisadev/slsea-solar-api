@@ -201,3 +201,21 @@ Each increment records the prompt I gave, what was generated, and what the revie
 | 6 | **Test-data mistake (mine):** the first ingestion tests posted the *next 15-minute slot*, which can be up to 15 minutes in the future just after a seed. The API correctly answered 400 ("cannot be in the future"). | Test validity | Tests post one minute after the latest reading. The API's 5-minute clock-skew rule stays. |
 | 7 | The `If-Match` test first sent a PUT without `status`, which got 400 rather than 412. Validation runs before the precondition, which RFC 9110 allows: an invalid request is rejected whatever its preconditions. | §9 | The test now sends a complete body. The ordering is documented behaviour. |
 | 8 | S7/S8 checklist: POST returns 201 with an absolute `Location` that resolves (tested); ETag and Last-Modified are sent; PUT requires every field (tested); PATCH uses JSON Merge Patch; the installation comes from the path and a body `installation_id` is rejected; DELETE gives 200 then 404; readings survive decommissioning (tested); PUT/PATCH/DELETE on readings get 405 with `Allow`. | §7, §9 | Verified. |
+
+---
+
+## Increment 11: District generation summary (upper-band stretch)
+
+**Prompt context:** brief §5 "Upper-band stretch: district generation summary" (current total power and today's total energy across a district's installations); rubric dimension 3 (First band requires it); WSO2 §4.5.
+
+**Generated:** `src/repositories/summaries.js` (one SQL query using LATERAL joins on the `(installation_id, recorded_at)` index), the route in `src/routes/districts.js`, `src/lib/time.js`, `test/summary.test.js` (6 tests), and the OpenAPI path and schema.
+
+**Review findings and fixes:**
+
+| # | Finding | Guideline | Fix |
+|---|---|---|---|
+| 1 | The obvious way to get "today's energy", `sum(power_kw) × 0.25 h`, undercounts whenever readings are missing and depends on the reporting interval. | Data correctness | Uses each inverter's cumulative counter: the last value in the Colombo day minus the last value before the day (or the day's first value for a new site). Missing readings can't lose energy. |
+| 2 | "Today" computed in UTC would put 00:00–05:30 Sri Lankan time in the previous day. | Domain correctness | Day boundaries are `date::timestamp AT TIME ZONE 'Asia/Colombo'`; the response states the `timezone` and `date`. |
+| 3 | "Current power" summed over every site's latest reading would count a site that went silent two days ago (the maintenance edge case) as still generating. | Domain correctness | Only sites that reported within `reporting_window_minutes` (60, matching the simulator's 30-minute cadence plus GitHub's scheduling delay) count. The window is exposed in the response. |
+| 4 | An aggregate query is easy to get subtly wrong and hard to eyeball. | Test validity | The test recomputes the summary independently in JavaScript from the raw rows and compares every figure. A sanity test checks that a full day's yield is 1.5–6.5 kWh per kW of capacity. |
+| 5 | Measured: about 10–15 ms per summary locally on the full 206k-row dataset. The LATERAL subqueries each use the unique index. | Performance | No change needed. |

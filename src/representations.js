@@ -47,6 +47,24 @@ export const toReading = (row) => ({
   received_at: row.received_at,
 });
 
+const round3 = (value) => Math.round(value * 1000) / 1000;
+
+// Processing resource (WSO2 §4.5): aggregate generation for one district.
+// "current_*" always describes now; "total_energy_kwh" describes `date`.
+export const toGenerationSummary = (district, date, timezone, reportingWindowMinutes, s) => ({
+  district_id: district.district_id,
+  district_name: district.name,
+  installation_count: s.installation_count,
+  installed_capacity_kw: round3(s.installed_capacity_kw),
+  reporting_installation_count: s.reporting_installation_count,
+  reporting_window_minutes: reportingWindowMinutes,
+  current_total_power_kw: round3(s.current_total_power_kw),
+  as_of: s.as_of,
+  date,
+  timezone,
+  total_energy_kwh: round3(s.total_energy_kwh),
+});
+
 // Composite resource (WSO2 §4.3): the installation plus what an operator
 // always needs alongside it: where it sits in the grid hierarchy and its
 // most recent reading. One reading only; the history lives in the readings
