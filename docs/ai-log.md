@@ -102,3 +102,21 @@ Each increment records the prompt I gave, what was generated, and what the revie
 | 4 | With default (non-strict) schemas, unknown query parameters such as `?district_id=` (underscore typo) would be silently ignored and return unfiltered data. | §5.7, client feedback | All query schemas are strict: unknown parameters get 400 and are named in `errors[]`. |
 | 5 | The installation query pushed a raw string straight into `conditions.clauses`, bypassing the `Conditions` API that guarantees client values are bound parameters. | SQL-injection hygiene | Added `addFixed()` for constant conditions; every client value goes through `add()`/`bind()`. |
 | 6 | S3 and S4 generator-mistake checklist: plural lowercase hyphenated collections (`/grid-substations`), no verbs, `{province-id}` URI-template variables in the spec, no global `/readings` yet, and seed data read from the database rather than per request. | §5.1, §5.6 | Verified. |
+
+---
+
+## Increment 6: Installation composite, last-reading and readings sub-collection
+
+**Prompt context:** the approved plan, increment 6. The S5 and S6 notes define the composite (embed exactly one most-recent item, never the history), the processing-function resource (`/last-position`, named with a noun), and S6's three generator mistakes for the composite.
+
+**Generated:** `src/repositories/readings.js`, `src/routes/{installationReadings,loaders}.js`, composite and reading representations, `test/installations.test.js`, and OpenAPI paths and schemas.
+
+**Review findings and fixes:**
+
+| # | Finding | Guideline | Fix |
+|---|---|---|---|
+| 1 | `installations.js` and `installationReadings.js` imported each other (circular dependency). It worked only because of ES-module evaluation order, which would be hard to defend. | Code structure | Moved `loadInstallation` into `src/routes/loaders.js`, which both routers import. |
+| 2 | `GET /installations/{id}/readings/abc` would have passed `'abc'` to a `bigint` comparison, and PostgreSQL would reject the cast as a **500**. | §9 (404 vs 500) | Non-numeric reading IDs are answered with 404 before querying. Tested. |
+| 3 | The composite changes when either the installation or its latest reading changes. Using only `installation.updated_at` as `Last-Modified` would let `If-Modified-Since` return a false "not modified" after a new reading arrived. | §8.2, §10.4 | `Last-Modified` is the later of `installation.updated_at` and `last_reading.received_at`. |
+| 4 | S6 composite checklist: newest reading chosen by `ORDER BY recorded_at DESC` (not array order or ascending); `last_reading` is a nested object, not `last_power`/`last_*` flat fields; no history array embedded; `last-reading` named with a hyphenated noun. | §4.3, §4.5, §5.1 | Verified, with tests comparing against the database's newest row. |
+| 5 | A reading lookup by ID alone would let `/installations/A/readings/{id of B's reading}` return B's data. | §4.6 scoping | The lookup is by (installation_id, reading_id). A test confirms the cross-parent read is 404. |

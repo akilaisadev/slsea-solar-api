@@ -30,3 +30,27 @@ export const toInstallation = (row) => ({
   commissioned_on: row.commissioned_on,
   status: row.status,
 });
+
+export const toReading = (row) => ({
+  reading_id: row.reading_id,
+  installation_id: row.installation_id,
+  recorded_at: row.recorded_at,
+  power_kw: row.power_kw,
+  energy_kwh: row.energy_kwh,
+  voltage_v: row.voltage_v,
+  received_at: row.received_at,
+});
+
+// Composite resource (WSO2 §4.3): the installation plus what an operator
+// always needs alongside it: where it sits in the grid hierarchy and its
+// most recent reading. One reading only; the history lives in the readings
+// sub-collection, never embedded here.
+export const toInstallationComposite = (row, lastReading) => ({
+  ...toInstallation(row),
+  location: {
+    grid_substation: { substation_id: row.substation_id, name: row.substation_name },
+    district: { district_id: row.district_id, name: row.district_name },
+    province: { province_id: row.province_id, name: row.province_name },
+  },
+  last_reading: lastReading ? toReading(lastReading) : null,
+});

@@ -203,16 +203,78 @@ paths:
       - $ref: '#/components/parameters/InstallationId'
     get:
       tags: [Installations]
-      summary: Get one installation
+      summary: Get one installation with its location and latest reading (composite)
+      description: |
+        Composite resource (WSO2 §4.3): the installation, its place in the grid hierarchy and its most
+        recent reading (`null` if it has never reported). The full history is the `readings` sub-collection.
       operationId: getInstallation
       responses:
         '200':
-          description: The installation.
+          description: The installation composite.
           headers:
             Last-Modified: { $ref: '#/components/headers/Last-Modified' }
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Installation' }
+              schema: { $ref: '#/components/schemas/InstallationComposite' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /installations/{installation-id}/last-reading:
+    parameters:
+      - $ref: '#/components/parameters/InstallationId'
+    get:
+      tags: [Readings]
+      summary: Latest reading of an installation (operational view)
+      description: |
+        Processing-function resource (WSO2 §4.5): derived from the time series on every request; nothing
+        is stored as "last value" on the installation. 404 if the installation has never reported.
+      operationId: getLastReading
+      responses:
+        '200':
+          description: The most recent reading by measurement time.
+          headers:
+            Last-Modified: { $ref: '#/components/headers/Last-Modified' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Reading' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /installations/{installation-id}/readings:
+    parameters:
+      - $ref: '#/components/parameters/InstallationId'
+    get:
+      tags: [Readings]
+      summary: Generation history of one installation (scoped collection)
+      operationId: listInstallationReadings
+      parameters:
+        - $ref: '#/components/parameters/Offset'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: A page of readings, newest first. An installation with no readings returns an empty page.
+          headers:
+            Last-Modified: { $ref: '#/components/headers/Last-Modified' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReadingCollection' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /installations/{installation-id}/readings/{reading-id}:
+    parameters:
+      - $ref: '#/components/parameters/InstallationId'
+      - $ref: '#/components/parameters/ReadingId'
+    get:
+      tags: [Readings]
+      summary: One reading (the target of the Location header after ingestion)
+      operationId: getReading
+      responses:
+        '200':
+          description: The reading.
+          headers:
+            Last-Modified: { $ref: '#/components/headers/Last-Modified' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Reading' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
 
@@ -248,6 +310,11 @@ components:
       in: path
       required: true
       schema: { type: string, pattern: '^ins-[0-9]{4,}$', example: ins-0001 }
+    ReadingId:
+      name: reading-id
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1, example: 1 }
 
   securitySchemes:
     bearerAuth:
@@ -360,6 +427,51 @@ components:
         longitude: { type: number, minimum: 79.4, maximum: 82, example: 79.91942 }
         commissioned_on: { type: string, format: date, example: '2020-10-22' }
         status: { type: string, enum: [active, maintenance], example: active }
+    InstallationComposite:
+      allOf:
+        - $ref: '#/components/schemas/Installation'
+        - type: object
+          required: [location, last_reading]
+          properties:
+            location:
+              type: object
+              properties:
+                grid_substation:
+                  type: object
+                  properties:
+                    substation_id: { type: string, example: gss-001 }
+                    name: { type: string, example: Kolonnawa Grid Substation }
+                district:
+                  type: object
+                  properties:
+                    district_id: { type: string, example: ds-01 }
+                    name: { type: string, example: Colombo }
+                province:
+                  type: object
+                  properties:
+                    province_id: { type: string, example: pv-01 }
+                    name: { type: string, example: Western }
+            last_reading:
+              oneOf:
+                - $ref: '#/components/schemas/Reading'
+                - type: 'null'
+    Reading:
+      type: object
+      description: One entry in an installation's append-only generation time series.
+      required: [reading_id, installation_id, recorded_at, power_kw, energy_kwh, voltage_v, received_at]
+      properties:
+        reading_id: { type: integer, readOnly: true, example: 865 }
+        installation_id: { type: string, readOnly: true, example: ins-0001 }
+        recorded_at: { type: string, format: date-time, description: When the device measured the values (UTC), example: '2026-10-03T08:45:00.000Z' }
+        power_kw: { type: number, minimum: 0, description: Instantaneous AC output power, example: 1.931 }
+        energy_kwh: { type: number, minimum: 0, description: Cumulative lifetime energy counter of the inverter, example: 38012.499 }
+        voltage_v: { type: number, description: Grid voltage at the inverter, example: 231.7 }
+        received_at: { type: string, format: date-time, readOnly: true, description: When the API received the reading (server clock), example: '2026-10-03T08:45:10.809Z' }
+    ReadingCollection:
+      allOf:
+        - $ref: '#/components/schemas/Page'
+        - properties:
+            items: { type: array, items: { $ref: '#/components/schemas/Reading' } }
     ProvinceCollection:
       allOf:
         - $ref: '#/components/schemas/Page'

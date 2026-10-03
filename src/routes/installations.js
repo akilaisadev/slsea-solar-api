@@ -4,14 +4,23 @@ import { allowOnly } from '../middleware/allow.js';
 import { ApiError } from '../lib/errors.js';
 import { parseQuery } from '../lib/validate.js';
 import { paginated, paginationParams } from '../lib/pagination.js';
-import { scopeOf, assertInScope } from '../lib/jurisdiction.js';
+import { scopeOf } from '../lib/jurisdiction.js';
 import { sendRepresentation } from '../lib/respond.js';
-import { listInstallations, findInstallation } from '../repositories/installations.js';
-import { toInstallation } from '../representations.js';
+import { listInstallations } from '../repositories/installations.js';
+import { findLastReading } from '../repositories/readings.js';
+import { toInstallation, toInstallationComposite, toReading } from '../representations.js';
+import { installationReadingsRouter } from './installationReadings.js';
+import { loadInstallation } from './loaders.js';
 
 export const installationsRouter = Router();
 
 const listQuery = z.strictObject({ ...paginationParams });
+
+// The later of two change times: the composite changes when either the
+// installation or its latest reading changes.
+function latest(...dates) {
+  return dates.filter(Boolean).reduce((a, b) => (a > b ? a : b), null);
+}
 
 installationsRouter.route('/')
   .get(async (req, res) => {
@@ -23,12 +32,30 @@ installationsRouter.route('/')
   })
   .all(allowOnly('GET'));
 
+// GET /installations/{installation-id}: composite (§4.3).
 installationsRouter.route('/:installationId')
   .get(async (req, res) => {
-    const { installationId } = req.params;
-    const installation = await findInstallation(req.app.locals.db, installationId);
-    if (!installation) throw new ApiError(40401, `Installation '${installationId}' was not found.`);
-    assertInScope(scopeOf(req), installation, `Installation '${installationId}'`);
-    sendRepresentation(req, res, toInstallation(installation), { lastModified: installation.updated_at });
+    const installation = await loadInstallation(req);
+    const lastReading = await findLastReading(req.app.locals.db, installation.installation_id);
+    sendRepresentation(req, res, toInstallationComposite(installation, lastReading), {
+      lastModified: latest(installation.updated_at, lastReading?.received_at),
+    });
   })
   .all(allowOnly('GET'));
+
+// GET /installations/{installation-id}/last-reading: processing-function
+// resource (§4.5). Derived from the time series on every request; nothing
+// like "last_power" is stored on the installation. Named with a noun
+// (§5.1), as the lecture notes do for /last-position.
+installationsRouter.route('/:installationId/last-reading')
+  .get(async (req, res) => {
+    const installation = await loadInstallation(req);
+    const lastReading = await findLastReading(req.app.locals.db, installation.installation_id);
+    if (!lastReading) {
+      throw new ApiError(40401, `Installation '${installation.installation_id}' has not reported any readings yet.`);
+    }
+    sendRepresentation(req, res, toReading(lastReading), { lastModified: lastReading.received_at });
+  })
+  .all(allowOnly('GET'));
+
+installationsRouter.use('/:installationId/readings', installationReadingsRouter);
