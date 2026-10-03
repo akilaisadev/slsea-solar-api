@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { allowOnly } from '../middleware/allow.js';
 import { config } from '../config.js';
+import { pingDatabase } from '../db/pool.js';
 
 // Operational probes, outside the versioned base path (not domain resources).
 //
@@ -23,7 +24,7 @@ healthRouter.route('/database')
     const started = Date.now();
     let database = 'ok';
     try {
-      await req.app.locals.db.query('SELECT 1');
+      await pingDatabase(req.app.locals.db);
     } catch {
       database = 'unavailable';
     }

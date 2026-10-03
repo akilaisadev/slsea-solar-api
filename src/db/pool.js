@@ -29,3 +29,8 @@ export function createPool(connectionString) {
   });
   return pool;
 }
+
+// The cheapest possible round trip, used by the readiness probe.
+export function pingDatabase(db) {
+  return db.query('SELECT 1');
+}

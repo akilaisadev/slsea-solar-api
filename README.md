@@ -18,6 +18,31 @@ npm run dev                 # http://localhost:3000
 npm test                    # runs against slsea_test
 ```
 
+## Code structure
+
+A request passes through four layers, each with one job:
+
+```
+request ─► middleware ─────────────► route ─────────────────────► repository ─► PostgreSQL
+           negotiate (406/415)        validate input (zod)          parameterised SQL only
+           authenticate (401)         load + jurisdiction (404/403)
+           requireScope (403)         choose status and headers
+                                          │
+                                          ▼
+                       representations.js (JSON shape) ─► respond.js (ETag, 304, Cache-Control)
+```
+
+| Folder | Responsibility | Rule |
+|---|---|---|
+| `src/routes/` | HTTP: one router per resource, status codes and headers | never writes SQL |
+| `src/repositories/` | data access, one module per aggregate | never sees `req` or `res`; client values only as bound parameters |
+| `src/representations.js` | every JSON shape the API returns | the only place field names are chosen |
+| `src/middleware/` | negotiation, authentication, scopes, 405, the error handler | runs before the routes |
+| `src/lib/` | cross-cutting rules: errors, conditional requests, pagination, jurisdiction, tokens, limits | no Express routing |
+| `src/db/` | connection pool, transactions, readiness ping | |
+
+Errors take a single path: any layer throws an `ApiError` from the catalogue in `src/lib/errors.js`, and the error handler turns it into the standard body.
+
 ## Error contract
 
 Every error response uses the same body (WSO2 §11):
@@ -75,6 +100,8 @@ Outside the base path: `POST /oauth2/token`, `GET /health`, `GET /health/databas
 |---|---|
 | `npm run dev` | API with auto-reload on http://localhost:3000 |
 | `npm test` | resets `slsea_test`, seeds a small dataset, runs all tests |
+| `npm run test:coverage` | the same, with the coverage gate CI uses (lines 95%, branches 90%, functions 95%) |
+| `npm run lint` | ESLint over the whole codebase |
 | `npm run db:migrate` / `db:seed` / `db:check` | schema / deterministic seed / dataset verification |
 | `npm run smoke -- <base-url>` | contract checks against a running deployment |
 | `npm run lint:openapi` | validates `openapi/openapi.yaml` |
