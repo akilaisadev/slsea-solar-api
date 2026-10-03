@@ -239,3 +239,20 @@ Each increment records the prompt I gave, what was generated, and what the revie
 | 5 | Smoke-testing the write path on the live deployment could corrupt the simulator's data. A test reading with a higher energy counter would make the simulator's next (lower) value look like the counter ran backwards, and it would be rejected. | Data integrity | The smoke reading is posted one second after the latest reading with the same values, so it can never break the counter's monotonic order. |
 
 **Evidence:** Swagger UI → Authorize (password flow) → `GET /provinces` returned 200 with all 9 provinces. The smoke test passes all 23 checks against the local server. The OpenAPI document lints with no errors or warnings.
+
+---
+
+## Increment 13: Device simulator and free-tier operations
+
+**Prompt context:** your choice of "Yes, GitHub Actions simulator" (keep `last-reading` and the district summary's "today" genuinely live until marking); the approved plan, increment 13.
+
+**Generated:** `scripts/simulate-devices.js` (no dependencies), `.github/workflows/simulate-devices.yml` (every 30 minutes, manual run with an adjustable look-back), and the split health endpoints.
+
+**Review findings and fixes:**
+
+| # | Finding | Guideline | Fix |
+|---|---|---|---|
+| 1 | **Operational cost:** Render polls the health-check path every few seconds, and the original `/health` ran `SELECT 1`. That would keep Neon's serverless compute awake 24/7, using up the free monthly compute allowance and risking the database being suspended before marking. | Deployment and operation | `/health` is now liveness only (no database); `/health/database` is the explicit readiness check used by the smoke test. Tests assert that `/health` doesn't report on the database. |
+| 2 | A simulator that wrote straight into the database would bypass the very write path being assessed. | Write-read split | Each simulated inverter gets its own token (client credentials) and POSTs through the public API, exercising authentication, device binding, validation and 201/409. |
+| 3 | A scheduled run can be delayed or skipped by GitHub, which would leave gaps in the 15-minute series. | Data completeness | Each run re-sends the last 6 slots (90 minutes). Because values come from the deterministic model, a slot already stored returns 409 instead of a conflicting duplicate. Verified locally: run 1 created the 471 missing readings with 945 × 409 and 0 failures; run 2 created only the new slot. |
+| 4 | GitHub Actions minutes are limited on private repositories (2,000 per month on the free plan). | Cost | 30-minute schedule ≈ 48 runs/day × 1 billed minute ≈ 1,440 minutes/month. The simulator needs no `npm install`, which keeps each run short. |

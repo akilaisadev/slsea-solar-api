@@ -5,11 +5,19 @@ import { app, db, assertErrorBody } from './helpers.js';
 
 after(() => db.end());
 
-test('GET /health reports the database as reachable', async () => {
+test('GET /health is a liveness probe that does not touch the database', async () => {
   const res = await request(app).get('/health');
   assert.equal(res.status, 200);
   assert.match(res.headers['content-type'], /^application\/json/);
+  assert.equal(res.body.status, 'ok');
+  assert.equal(res.body.database, undefined);
+});
+
+test('GET /health/database reports the database as reachable', async () => {
+  const res = await request(app).get('/health/database');
+  assert.equal(res.status, 200);
   assert.equal(res.body.database, 'ok');
+  assert.equal(typeof res.body.latency_ms, 'number');
 });
 
 test('a non-JSON Accept header is refused with 406', async () => {

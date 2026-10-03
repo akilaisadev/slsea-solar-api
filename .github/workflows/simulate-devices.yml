@@ -1,0 +1,35 @@
+name: Device simulator
+
+# Keeps the deployed API's data live: every 30 minutes each seeded inverter
+# authenticates as its installation and posts its latest readings through
+# the public API. Needs the repository variable API_BASE_URL and the secret
+# DEVICE_SECRET_SEED; it is skipped until both exist.
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+    inputs:
+      lookback_slots:
+        description: Number of 15-minute slots to (re)send per installation (96 = one day)
+        default: '6'
+
+concurrency:
+  group: device-simulator
+  cancel-in-progress: false
+
+jobs:
+  simulate:
+    if: ${{ vars.API_BASE_URL != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      # The simulator uses only Node built-ins, so no npm install is needed.
+      - run: node scripts/simulate-devices.js
+        env:
+          API_BASE_URL: ${{ vars.API_BASE_URL }}
+          DEVICE_SECRET_SEED: ${{ secrets.DEVICE_SECRET_SEED }}
+          LOOKBACK_SLOTS: ${{ inputs.lookback_slots || '6' }}

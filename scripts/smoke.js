@@ -41,8 +41,8 @@ async function token(form) {
 const started = Date.now();
 
 // --- operations and documentation
-const health = await call(`${base}/health`);
-check('GET /health', '200, database ok', `${health.status}, ${health.json?.database}`, health.status === 200 && health.json?.database === 'ok');
+const health = await call(`${base}/health/database`);
+check('GET /health/database', '200, database ok', `${health.status}, ${health.json?.database}`, health.status === 200 && health.json?.database === 'ok');
 const docs = await call(`${base}/docs/`, { headers: { Accept: 'text/html' } });
 check('GET /docs (Swagger UI)', '200 text/html', `${docs.status} ${docs.headers.get('content-type')}`, docs.status === 200 && /text\/html/.test(docs.headers.get('content-type')));
 const spec = await call(`${base}/openapi.json`);
