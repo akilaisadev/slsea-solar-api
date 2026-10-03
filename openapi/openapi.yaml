@@ -5,7 +5,7 @@ info:
   summary: Ingests and serves rooftop solar generation data for the Sri Lanka Sustainable Energy Authority.
   license:
     name: Proprietary (NB6007CEM coursework, all rights reserved)
-    identifier: LicenseRef-Coursework
+    url: https://github.com/akilaisadev/slsea-solar-api
   description: |
     REST API at the centre of SLSEA's national solar monitoring system (NB6007CEM coursework).
 
@@ -796,7 +796,6 @@ components:
       description: ETag(s) of the copy the client holds; 304 if it is still current. Takes precedence over If-Modified-Since.
       schema:
         type: string
-        example: '"mEAzF-1JA3Rf1t23EW0ibWnB8G3hbfpW"'
     IfMatch:
       name: If-Match
       in: header
@@ -813,7 +812,6 @@ components:
       description: HTTP-date of the copy the client holds; 304 if unchanged since (ignored when If-None-Match is sent).
       schema:
         type: string
-        example: Sat, 03 Oct 2026 08:45:00 GMT
 
   securitySchemes:
     bearerAuth:
@@ -995,8 +993,7 @@ components:
             items: { type: array, items: { $ref: '#/components/schemas/Installation' } }
     GenerationSummary:
       type: object
-      required: [ district_id, district_name, installation_count, installed_capacity_kw, reporting_installation_count,
-        reporting_window_minutes, current_total_power_kw, as_of, date, timezone, total_energy_kwh ]
+      required: [ district_id, district_name, installation_count, installed_capacity_kw, reporting_installation_count, reporting_window_minutes, current_total_power_kw, as_of, date, timezone, total_energy_kwh ]
       properties:
         district_id: { type: string, example: ds-01 }
         district_name: { type: string, example: Colombo }

@@ -43,7 +43,8 @@ const failedAttemptsLimiter = rateLimit({
   skipSuccessfulRequests: true,
   standardHeaders: 'draft-8',
   legacyHeaders: false,
-  keyGenerator: (req) => `credential:${req.body?.client_id ?? req.body?.username ?? 'anonymous'}`,
+  // || rather than ??: an empty string must not become one shared bucket.
+  keyGenerator: (req) => `credential:${req.body?.client_id || req.body?.username || 'anonymous'}`,
   handler: (req, res, next) => next(new ApiError(42901, 'Too many failed token requests for this credential. Try again later.')),
 });
 
@@ -54,22 +55,25 @@ function basicClientCredentials(req) {
   if (scheme?.toLowerCase() !== 'basic' || !encoded) return null;
   const decoded = Buffer.from(encoded, 'base64').toString('utf8');
   const separator = decoded.indexOf(':');
-  if (separator < 0) return null;
-  return {
-    client_id: decodeURIComponent(decoded.slice(0, separator)),
-    client_secret: decodeURIComponent(decoded.slice(separator + 1)),
-  };
+  const clientId = separator < 0 ? '' : decodeURIComponent(decoded.slice(0, separator));
+  // Swagger UI's password flow sends "Basic Og==" (an empty id and secret)
+  // even for user logins; an empty client id is no credential at all.
+  if (!clientId) return null;
+  return { client_id: clientId, client_secret: decodeURIComponent(decoded.slice(separator + 1)) };
 }
 
-// Grants the requested scopes if every one is allowed; no request = all allowed.
+// Grants the requested scopes that this client may hold (no request = all
+// it may hold). RFC 6749 §3.3 allows granting a subset; the response's
+// `scope` field always states what was actually granted. Only a request in
+// which nothing is grantable is refused (400).
 function grantedScopes(requested, allowed) {
   if (!requested) return allowed;
   const wanted = requested.split(' ').filter(Boolean);
-  const refused = wanted.filter((scope) => !allowed.includes(scope));
-  if (refused.length) {
-    throw new ApiError(40005, `Scope not permitted for this client: ${refused.join(', ')}.`);
+  const granted = wanted.filter((scope) => allowed.includes(scope));
+  if (granted.length === 0) {
+    throw new ApiError(40005, `None of the requested scopes are permitted for this client: ${wanted.join(', ')}.`);
   }
-  return wanted;
+  return granted;
 }
 
 function invalidCredentials() {

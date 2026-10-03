@@ -56,6 +56,13 @@ test('client credentials grant works with body or HTTP Basic client authenticati
   assert.equal(viaBasic.status, 200);
 });
 
+test('the password grant works the way Swagger UI sends it (empty Basic client)', async () => {
+  const res = await tokenRequest().set('Authorization', 'Basic Og==').type('form')
+    .send({ grant_type: 'password', username: 'western.analyst', password: process.env.DEMO_PASSWORD, scope: 'assets:read' });
+  assert.equal(res.status, 200);
+  assert.equal(res.body.scope, 'assets:read');
+});
+
 test('an asset administrator also receives installations:write', async () => {
   const res = await tokenRequest().send({ grant_type: 'password', username: 'asset.admin', password: process.env.DEMO_PASSWORD });
   assert.equal(res.body.scope, 'assets:read readings:read installations:write');
@@ -84,6 +91,14 @@ test('malformed token requests get 400, 405 or 415', async () => {
   const get = await request(app).get('/oauth2/token');
   assertErrorBody(get, 405, 40501);
   assert.equal(get.headers.allow, 'POST, OPTIONS');
+});
+
+test('requested scopes beyond the client\'s rights are dropped, and the response says so', async () => {
+  // Swagger UI's "select all" asks an analyst for installations:write too.
+  const res = await tokenRequest().send({ grant_type: 'password', username: 'national.analyst',
+    password: process.env.DEMO_PASSWORD, scope: 'assets:read readings:read installations:write' });
+  assert.equal(res.status, 200);
+  assert.equal(res.body.scope, 'assets:read readings:read');
 });
 
 test('a narrower requested scope is honoured and enforced', async () => {

@@ -219,3 +219,23 @@ Each increment records the prompt I gave, what was generated, and what the revie
 | 3 | "Current power" summed over every site's latest reading would count a site that went silent two days ago (the maintenance edge case) as still generating. | Domain correctness | Only sites that reported within `reporting_window_minutes` (60, matching the simulator's 30-minute cadence plus GitHub's scheduling delay) count. The window is exposed in the response. |
 | 4 | An aggregate query is easy to get subtly wrong and hard to eyeball. | Test validity | The test recomputes the summary independently in JavaScript from the raw rows and compares every figure. A sanity test checks that a full day's yield is 1.5–6.5 kWh per kW of capacity. |
 | 5 | Measured: about 10–15 ms per summary locally on the full 206k-row dataset. The LATERAL subqueries each use the unique index. | Performance | No change needed. |
+
+---
+
+## Increment 12: Verification: Swagger UI, smoke test, CI lint
+
+**Prompt context:** the approved plan, increment 12; rubric dimensions 5 (functionality against seed data) and 6 (live Swagger UI).
+
+**Generated:** `scripts/smoke.js` (23 contract checks against any deployment, read-only mode available), the `smoke` and `lint:openapi` npm scripts, an OpenAPI lint step in CI, and two auth tests.
+
+**Review findings and fixes (found by using Swagger UI in a real browser):**
+
+| # | Finding | Guideline | Fix |
+|---|---|---|---|
+| 1 | **Shared rate-limit bucket.** Swagger UI's password flow sends `Authorization: Basic Og==` (an empty client id and secret) even for user logins. The token endpoint merged the empty `client_id` into the body, and the rate-limit key used `??`, so every user's failures would have been counted under one key `credential:`. One mistyped password could start locking everyone out. | Availability, §12 | Empty Basic credentials are ignored, and the key uses `||`. A regression test sends `Basic Og==` exactly as Swagger does. |
+| 2 | Swagger UI's "select all" requests `installations:write` for an analyst, and the endpoint refused the whole request (400). That was correct but unhelpful to anyone trying the API. | RFC 6749 §3.3 | The server grants the permitted subset and states it in the `scope` response field. It refuses only when none is grantable. Tested both ways. |
+| 3 | The `If-None-Match`/`If-Modified-Since` parameters had `example` values, which Swagger UI pre-fills into "Try it out". A marker clicking Execute would unknowingly send conditional headers and could get a puzzling 304. | Documentation usability | Removed those examples; the inputs start empty. |
+| 4 | The `license.identifier` value made Swagger UI link to a non-existent SPDX page. | Documentation accuracy | Replaced it with a URL. |
+| 5 | Smoke-testing the write path on the live deployment could corrupt the simulator's data. A test reading with a higher energy counter would make the simulator's next (lower) value look like the counter ran backwards, and it would be rejected. | Data integrity | The smoke reading is posted one second after the latest reading with the same values, so it can never break the counter's monotonic order. |
+
+**Evidence:** Swagger UI → Authorize (password flow) → `GET /provinces` returned 200 with all 9 provinces. The smoke test passes all 23 checks against the local server. The OpenAPI document lints with no errors or warnings.
