@@ -1,0 +1,190 @@
+openapi: 3.1.0
+info:
+  title: SLSEA Real-Time Solar Generation Data API
+  version: 1.0.0
+  summary: Ingests and serves rooftop solar generation data for the Sri Lanka Sustainable Energy Authority.
+  description: |
+    REST API at the centre of SLSEA's national solar monitoring system (NB6007CEM coursework).
+
+    **Two kinds of client, two permissions**
+    - *Metering devices* (write clients) authenticate as one installation and may only append
+      generation readings for that installation (`readings:write`).
+    - *SLSEA users* (read clients) read data inside their jurisdiction: national, one province or one
+      district (`assets:read`, `readings:read`). Asset administrators may also manage installations
+      (`installations:write`).
+
+    **Getting a token:** `POST /oauth2/token`, or use the **Authorize** button. Demo credentials are
+    listed in the repository README.
+
+    **Conventions:** JSON only (`application/json`); snake_case fields with units in the name
+    (`power_kw`, `energy_kwh`, `voltage_v`); timestamps are ISO 8601 UTC; collections are paginated with
+    `offset`/`limit` and return `count`, `next` and `previous`; every GET supports conditional requests
+    (`If-None-Match` / `If-Modified-Since` → `304`); every error uses the `Error` schema.
+servers:
+  - url: /solar/v1
+    description: This deployment (versioned base path)
+tags:
+  - name: Hierarchy
+    description: Provinces, districts and grid substations (read only)
+  - name: Installations
+    description: Rooftop solar installations (the metered assets)
+  - name: Readings
+    description: Append-only generation time series
+  - name: Analytics
+    description: Derived, processing-style resources
+  - name: Auth
+    description: Token issuance (OAuth 2.0 style)
+  - name: Operations
+    description: Health and error documentation
+
+paths:
+  /health:
+    servers:
+      - url: /
+    get:
+      tags: [Operations]
+      summary: Service and database health
+      operationId: getHealth
+      security: []
+      responses:
+        '200':
+          description: The service and its database are reachable.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Health' }
+        '503':
+          description: The service is up but the database is unreachable.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Health' }
+  /errors/{error-code}:
+    servers:
+      - url: /
+    get:
+      tags: [Operations]
+      summary: Explanation of one error code (the target of every `more_info` link)
+      operationId: getErrorCode
+      security: []
+      parameters:
+        - name: error-code
+          in: path
+          required: true
+          schema: { type: integer, example: 40401 }
+      responses:
+        '200':
+          description: The error catalogue entry.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorCatalogueEntry' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access token from `POST /oauth2/token`.
+    oauth2:
+      type: oauth2
+      description: |
+        Devices use the client credentials grant (client_id = installation id). SLSEA users use the
+        password grant. Both return a JWT bearer token.
+      flows:
+        clientCredentials:
+          tokenUrl: /oauth2/token
+          scopes:
+            readings:write: Append generation readings for the authenticated installation only
+        password:
+          tokenUrl: /oauth2/token
+          scopes:
+            assets:read: Read the hierarchy and installations within the user's jurisdiction
+            readings:read: Read generation readings and summaries within the user's jurisdiction
+            installations:write: Register, replace, update and decommission installations (national admins)
+
+  headers:
+    ETag:
+      description: Strong entity tag of this representation; send it back in `If-None-Match` or `If-Match`.
+      schema: { type: string, example: '"5d41402abc4b2a76b9719d911017c592"' }
+    Last-Modified:
+      description: When the underlying data last changed (HTTP-date).
+      schema: { type: string, example: 'Sat, 03 Oct 2026 08:45:00 GMT' }
+    Location:
+      description: Absolute URI of the resource that was created.
+      schema: { type: string, format: uri }
+    Allow:
+      description: Methods supported by this URI.
+      schema: { type: string, example: 'GET, HEAD, OPTIONS' }
+    WWW-Authenticate:
+      description: Authentication scheme and error (RFC 6750).
+      schema: { type: string, example: 'Bearer realm="slsea", error="invalid_token"' }
+
+  schemas:
+    Error:
+      type: object
+      description: The single error body used for every 4xx and 5xx response (WSO2 §11).
+      required: [code, message, description, more_info, errors]
+      properties:
+        code: { type: integer, description: Product-specific error code (HTTP status x 100 + sequence), example: 40401 }
+        message: { type: string, description: What went wrong with this request, example: "Installation 'ins-9999' was not found." }
+        description: { type: string, description: Short, stable description of the error code, example: Resource not found }
+        more_info: { type: string, format: uri, description: Link to the catalogue entry for this code }
+        errors:
+          type: array
+          description: Individual problems, for example one entry per invalid field or parameter.
+          items: { $ref: '#/components/schemas/ErrorListItem' }
+    ErrorListItem:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: integer, example: 40002 }
+        field: { type: string, description: The body field or query parameter concerned, example: power_kw }
+        message: { type: string, example: must be greater than or equal to 0 }
+    ErrorCatalogueEntry:
+      type: object
+      properties:
+        code: { type: integer, example: 40401 }
+        http_status: { type: integer, example: 404 }
+        description: { type: string }
+        resolution: { type: string }
+    Health:
+      type: object
+      properties:
+        status: { type: string, enum: [ok, degraded] }
+        database: { type: string, enum: [ok, unavailable] }
+        version: { type: string, example: 1.0.0 }
+        uptime_seconds: { type: integer }
+
+  responses:
+    BadRequest:
+      description: A query parameter or body field is invalid; `errors` lists each problem.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unauthorized:
+      description: The bearer token is missing, invalid or expired.
+      headers:
+        WWW-Authenticate: { $ref: '#/components/headers/WWW-Authenticate' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: The token is valid but lacks the scope, or the resource is outside the caller's jurisdiction.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: No resource exists with this identifier.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotAcceptable:
+      description: The Accept header excludes application/json.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotModified:
+      description: The client's cached copy is current (empty body).
+      headers:
+        ETag: { $ref: '#/components/headers/ETag' }
+        Last-Modified: { $ref: '#/components/headers/Last-Modified' }

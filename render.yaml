@@ -1,0 +1,22 @@
+# Render Blueprint: one free web service in Singapore (closest region to
+# Sri Lanka). The database is Neon Postgres (also Singapore), connected via
+# DATABASE_URL. Secrets are entered in the Render dashboard, never committed.
+services:
+  - type: web
+    name: slsea-solar-api
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: npm ci --omit=dev
+    # The schema script is idempotent, so applying it on every start is safe.
+    startCommand: npm run db:migrate && npm start
+    healthCheckPath: /health
+    # Deploy only after the GitHub Actions test run on the commit passes.
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false

@@ -6,6 +6,7 @@ import { allowOnly } from './middleware/allow.js';
 import { notFound, errorHandler } from './middleware/errorHandler.js';
 import { healthRouter } from './routes/health.js';
 import { errorsRouter } from './routes/errors.js';
+import { docsRouter } from './routes/docs.js';
 import { absoluteUrl } from './lib/urls.js';
 
 export function createApp({ db }) {
@@ -21,6 +22,9 @@ export function createApp({ db }) {
   app.use(helmet());
   app.use(express.json({ limit: '10kb', type: ['application/json', 'application/merge-patch+json'] }));
 
+  // Swagger UI is HTML for people, so it is mounted before the JSON-only rule.
+  app.use(docsRouter);
+
   app.use(requireJsonAccept);
 
   app.route('/')
@@ -29,6 +33,9 @@ export function createApp({ db }) {
         name: 'SLSEA Real-Time Solar Generation Data API',
         version: config.version,
         base_path: absoluteUrl(req, config.basePath),
+        documentation: absoluteUrl(req, '/docs'),
+        openapi: absoluteUrl(req, '/openapi.json'),
+        token_endpoint: absoluteUrl(req, '/oauth2/token'),
         health: absoluteUrl(req, '/health'),
       });
     })

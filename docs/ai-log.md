@@ -67,3 +67,19 @@ Each increment records the prompt I gave, what was generated, and what the revie
 | 4 | Generated seeds usually use `Math.random()`, so the data changes on every run and a simulator can't reproduce past values. | Viva explainability | Every value is a pure hash of (installation, time slot). The seed and the simulator compute identical readings, so a re-sent slot is a genuine duplicate (409). |
 
 **Evidence (full seed, local):** 9 provinces, 25 districts, 32 substations, 240 installations, 5 users and 206,159 readings. No orphaned foreign keys, zero generation in all 83k+ overnight readings, and no decreasing energy counters. The `npm run db:check` table output is a report screenshot candidate.
+
+---
+
+## Increment 4: Deployment configuration and Swagger UI
+
+**Prompt context:** the approved plan, increment 4 "Deploy early" (Render + Neon, live `/health`, Swagger at `/docs`). The S2 notes stress `process.env.PORT` and a start command that matches the entry file.
+
+**Generated:** `render.yaml` (Blueprint, Singapore region, `/health` health check, deploy only after CI passes), `openapi/openapi.yaml` (OpenAPI 3.1 skeleton: security schemes, shared headers, `Error` schema, standard responses), `src/routes/docs.js` (Swagger UI and `/openapi.json`), `test/docs.test.js`.
+
+**Review findings and fixes:**
+
+| # | Finding | Guideline | Fix |
+|---|---|---|---|
+| 1 | `swagger-ui-express` pulls in `@scarf/scarf`, which runs an install-time analytics script. npm 12 blocked it with a warning. | Supply-chain hygiene | Denied it explicitly (`allowScripts: {"@scarf/scarf": false}` in `package.json`), so no telemetry runs in local or Render builds. |
+| 2 | The global JSON-only `Accept` rule (406) would also apply to Swagger UI, which browsers request as `text/html`. | §10.1 vs. usability | Mounted the docs router before the negotiation middleware. A test checks that `/docs/` returns HTML. |
+| 3 | helmet's default Content-Security-Policy can break Swagger UI. | Security headers | Checked in the browser: Swagger UI loads with no console errors, so the default CSP stays as is. |
