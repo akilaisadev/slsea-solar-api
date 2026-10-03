@@ -30,4 +30,20 @@ Each increment records the prompt I gave, what was generated, and what the revie
 | 3 | Express generates weak ETags automatically and answers `If-None-Match` itself, which would hide how conditional GET works. | §10.4 | Set `app.set('etag', false)`. ETags will be generated explicitly per resource in increment 8. |
 | 4 | Behind Render's TLS proxy, `req.protocol` would report `http`, so absolute `Location`/`more_info` URLs would be wrong. | §5.2 (HTTPS) | Set `app.set('trust proxy', 1)`. |
 
-**Plan deviation:** the Docker daemon wasn't running locally, so local development uses the existing Homebrew PostgreSQL 16 (`slsea_dev` and `slsea_test` databases) instead of docker-compose. CI uses a `postgres:16` service container.
+**Plan deviation (increment 1):** the Docker daemon wasn't running locally, so local development uses the existing Homebrew PostgreSQL 16 (`slsea_dev` and `slsea_test` databases) instead of docker-compose. CI uses a `postgres:16` service container.
+
+---
+
+## Increment 2: Data model and schema
+
+**Prompt context:** the approved plan, §1 "Data model" (five-entity hierarchy plus User; inverter_id as an attribute; append-only readings).
+
+**Generated:** `docs/data-model.md` (implementation-independent Mermaid ER), `db/schema.sql`, `scripts/migrate.js`, `test/schema.test.js`.
+
+**Review findings and fixes:**
+
+| # | Finding | Guideline | Fix |
+|---|---|---|---|
+| 1 | The first `updated_at` trigger test compared timestamps with `>=` inside one transaction. Because `now()` is fixed for the whole transaction, the test would pass even if the trigger didn't exist. | Test validity | The fixture now inserts the installation with `updated_at = 2000-01-01`, and the test asserts that the update replaces it. |
+| 2 | Checked against the S1 "generator mistakes" list: no Device entity, no `last_power`/`last_*` fields on the installation, no format names (`json_payload`) in the model, and the User is never a data producer. | WSO2 §3, S1 notes | Nothing to change; recorded as a deliberate check. |
+| 3 | "Append-only" was only a convention (no PUT/DELETE routes). | Brief §3 | Added a `BEFORE UPDATE OR DELETE` trigger that rejects row changes, with tests proving it. TRUNCATE stays possible for the seed reset, which is a maintenance-only operation. |
