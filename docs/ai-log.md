@@ -256,3 +256,13 @@ Each increment records the prompt I gave, what was generated, and what the revie
 | 2 | A simulator that wrote straight into the database would bypass the very write path being assessed. | Write-read split | Each simulated inverter gets its own token (client credentials) and POSTs through the public API, exercising authentication, device binding, validation and 201/409. |
 | 3 | A scheduled run can be delayed or skipped by GitHub, which would leave gaps in the 15-minute series. | Data completeness | Each run re-sends the last 6 slots (90 minutes). Because values come from the deterministic model, a slot already stored returns 409 instead of a conflicting duplicate. Verified locally: run 1 created the 471 missing readings with 945 × 409 and 0 failures; run 2 created only the new slot. |
 | 4 | GitHub Actions minutes are limited on private repositories (2,000 per month on the free plan). | Cost | 30-minute schedule ≈ 48 runs/day × 1 billed minute ≈ 1,440 minutes/month. The simulator needs no `npm install`, which keeps each run short. |
+
+---
+
+## Increment 14: Documentation for deployment, report and viva
+
+**Generated:** `docs/deployment.md` (Neon, Render and GitHub runbook), a report evidence pack (tables, diagrams, bullet facts, screenshot list and APA 7 references; **no report prose**), viva revision notes (likely questions with pointers to the code), and the README resource map. The evidence pack and revision notes are my private study material, kept in a local folder outside version control.
+
+**Review notes:**
+- The evidence pack first said "17 URI templates". That count included the health, errors and token paths. Corrected to the 13 resource URI templates under `/solar/v1`.
+- On integrity: the report prose is mine to write. The evidence pack deliberately contains only facts, tables and bullet points.
