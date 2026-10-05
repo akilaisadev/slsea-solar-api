@@ -1,0 +1,10 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "regions": ["sin1"],
+  "functions": {
+    "api/index.js": {
+      "includeFiles": "{openapi/**,node_modules/swagger-ui-dist/**}"
+    }
+  },
+  "rewrites": [{ "source": "/(.*)", "destination": "/api" }]
+}
