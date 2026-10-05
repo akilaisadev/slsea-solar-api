@@ -10,6 +10,10 @@ const SITE = 'ins-0019'; // reports normally in the small seed
 const URL = `/solar/v1/installations/${SITE}/readings`;
 const device = as(await deviceToken(SITE));
 const MINUTE = 60 * 1000;
+// Uploads after the latest reading step forward in 10-second increments:
+// the seed ends at the current 15-minute slot, so whole-minute steps could
+// land more than 5 minutes ahead of the clock and be refused as future.
+const STEP = 10 * 1000;
 
 async function readingsOf(limit, order = 'DESC') {
   const { rows } = await db.query(
@@ -38,7 +42,7 @@ test('a back-filled reading may not exceed the counter of the reading after it',
 
 test('simultaneous identical uploads: exactly one is stored, the other is a 409', async () => {
   const [latest] = await readingsOf(1);
-  const reading = body(latest.recorded_at.getTime() + MINUTE, latest.energy_kwh + 0.1);
+  const reading = body(latest.recorded_at.getTime() + STEP, latest.energy_kwh + 0.1);
   const statuses = (await Promise.all([device.post(URL).send(reading), device.post(URL).send(reading)]))
     .map((r) => r.status).sort();
   assert.deepEqual(statuses, [201, 409]);
@@ -49,8 +53,8 @@ test('simultaneous conflicting uploads cannot both pass the counter check', asyn
   // the lower value. Whichever the server handles second must be refused.
   const [latest] = await readingsOf(1);
   const t = latest.recorded_at.getTime();
-  const first = body(t + 2 * MINUTE, latest.energy_kwh + 0.5);
-  const second = body(t + 3 * MINUTE, latest.energy_kwh + 0.2);
+  const first = body(t + STEP, latest.energy_kwh + 0.5);
+  const second = body(t + 2 * STEP, latest.energy_kwh + 0.2);
   const statuses = (await Promise.all([device.post(URL).send(first), device.post(URL).send(second)]))
     .map((r) => r.status).sort();
   assert.deepEqual(statuses, [201, 400]);
@@ -59,7 +63,7 @@ test('simultaneous conflicting uploads cannot both pass the counter check', asyn
 test('simultaneous valid uploads at different instants are all stored', async () => {
   const [latest] = await readingsOf(1);
   const t = latest.recorded_at.getTime();
-  const uploads = [1, 2, 3, 4, 5].map((n) => device.post(URL).send(body(t + n * MINUTE, latest.energy_kwh + n * 0.1)));
+  const uploads = [1, 2, 3, 4, 5].map((n) => device.post(URL).send(body(t + n * STEP, latest.energy_kwh + n * 0.1)));
   const statuses = (await Promise.all(uploads)).map((r) => r.status);
   assert.deepEqual(statuses, [201, 201, 201, 201, 201]);
   const stored = await readingsOf(6);
