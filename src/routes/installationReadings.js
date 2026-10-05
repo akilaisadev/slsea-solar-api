@@ -11,8 +11,10 @@ import { sendRepresentation, sendPage } from '../lib/respond.js';
 import { absoluteUrl } from '../lib/urls.js';
 import { CLOCK_SKEW_MS, MAX_POWER_TO_CAPACITY_RATIO, MAX_VOLTAGE_V } from '../lib/limits.js';
 import {
-  listInstallationReadings, findReading, findReadingBefore, findReadingAt, insertReading,
+  listInstallationReadings, findReading, findReadingBefore, findReadingAfter, findReadingAt, insertReading,
+  lockInstallationReadings,
 } from '../repositories/readings.js';
+import { withTransaction } from '../db/transaction.js';
 import { toReading } from '../representations.js';
 import { loadInstallation, loadDeviceInstallation } from './loaders.js';
 import { timeWindowParams, timeWindowOf, order } from './queryParams.js';
@@ -77,21 +79,37 @@ installationReadingsRouter.route('/')
     if (reading.power_kw > installation.capacity_kw * MAX_POWER_TO_CAPACITY_RATIO) {
       throw invalidField('power_kw', `exceeds ${MAX_POWER_TO_CAPACITY_RATIO * 100}% of the installation's ${installation.capacity_kw} kW capacity`);
     }
-    const previous = await findReadingBefore(db, installation.installation_id, recordedAt);
-    if (previous && reading.energy_kwh < previous.energy_kwh) {
-      throw invalidField('energy_kwh', `is a cumulative counter and cannot fall below the previous reading (${previous.energy_kwh} kWh)`);
-    }
+    const id = installation.installation_id;
+    const created = await withTransaction(db, async (tx) => {
+      // One upload at a time per installation: without this, two readings
+      // arriving together could both pass the counter checks against the
+      // same neighbours and leave the series out of order.
+      await lockInstallationReadings(tx, id);
 
-    const created = await insertReading(db, installation.installation_id, { ...reading, recorded_at: recordedAt });
-    if (!created) {
-      // Same installation, same instant: a retried upload. The time series
-      // keeps one value per instant, so the duplicate is refused (409) and
-      // the client is told where the existing reading lives.
-      const existing = await findReadingAt(db, installation.installation_id, recordedAt);
-      throw new ApiError(40901, `A reading for ${recordedAt.toISOString()} already exists at ${readingUri(req, installation.installation_id, existing.reading_id)}.`);
-    }
+      // energy_kwh is a cumulative counter, so it must sit between the
+      // readings either side of this instant. Checking the next reading as
+      // well matters for late (back-filled) uploads from a buffering device.
+      const previous = await findReadingBefore(tx, id, recordedAt);
+      if (previous && reading.energy_kwh < previous.energy_kwh) {
+        throw invalidField('energy_kwh', `is a cumulative counter and cannot fall below the previous reading (${previous.energy_kwh} kWh)`);
+      }
+      const next = await findReadingAfter(tx, id, recordedAt);
+      if (next && reading.energy_kwh > next.energy_kwh) {
+        throw invalidField('energy_kwh', `is a cumulative counter and cannot exceed the next reading (${next.energy_kwh} kWh at ${next.recorded_at.toISOString()})`);
+      }
 
-    res.set('Location', readingUri(req, installation.installation_id, created.reading_id));
+      const inserted = await insertReading(tx, id, { ...reading, recorded_at: recordedAt });
+      if (!inserted) {
+        // Same installation, same instant: a retried upload. The time series
+        // keeps one value per instant, so the duplicate is refused (409) and
+        // the client is told where the existing reading lives.
+        const existing = await findReadingAt(tx, id, recordedAt);
+        throw new ApiError(40901, `A reading for ${recordedAt.toISOString()} already exists at ${readingUri(req, id, existing.reading_id)}.`);
+      }
+      return inserted;
+    });
+
+    res.set('Location', readingUri(req, id, created.reading_id));
     sendRepresentation(req, res, toReading(created), { status: 201, lastModified: created.received_at });
   })
   .all(allowOnly('GET', 'POST'));

@@ -86,6 +86,25 @@ export async function findReadingBefore(db, installationId, instant) {
   return rows[0] ?? null;
 }
 
+// The reading immediately after an instant: a back-filled reading must not
+// carry a higher cumulative counter than the one that follows it.
+export async function findReadingAfter(db, installationId, instant) {
+  const { rows } = await db.query(
+    `SELECT ${READING_COLUMNS} FROM generation_reading r
+     WHERE r.installation_id = $1 AND r.recorded_at > $2
+     ORDER BY r.recorded_at ASC LIMIT 1`,
+    [installationId, instant],
+  );
+  return rows[0] ?? null;
+}
+
+// Serialises uploads for one installation until the transaction ends
+// (a PostgreSQL advisory lock keyed on the installation id). Uploads for
+// different installations still run in parallel.
+export async function lockInstallationReadings(tx, installationId) {
+  await tx.query('SELECT pg_advisory_xact_lock(hashtext($1))', [installationId]);
+}
+
 // Appends one reading. received_at is set by the database clock, never by
 // the client. Returns null if a reading already exists for that instant
 // (the unique constraint makes a retried upload harmless).
