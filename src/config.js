@@ -7,6 +7,8 @@ export const config = {
   port: Number(env.PORT) || 3000,
   databaseUrl: env.DATABASE_URL,
   basePath: '/solar/v1',
+  // One JSON access-log line per request; set LOG_REQUESTS=false to silence (tests do).
+  logRequests: env.LOG_REQUESTS !== 'false',
   version: '1.0.0',
   jwt: {
     secret: env.JWT_SECRET,

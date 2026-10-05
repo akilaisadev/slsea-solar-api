@@ -30,4 +30,9 @@ export default [
       'no-console': ['error', { allow: ['log', 'error', 'table'] }],
     },
   },
+  {
+    // Tests replace console methods temporarily to capture log output.
+    files: ['test/**/*.js'],
+    rules: { 'no-console': 'off' },
+  },
 ];

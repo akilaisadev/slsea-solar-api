@@ -43,6 +43,12 @@ request ─► middleware ─────────────► route ─�
 
 Errors take a single path: any layer throws an `ApiError` from the catalogue in `src/lib/errors.js`, and the error handler turns it into the standard body.
 
+## Operations
+
+- Every response carries an `X-Request-Id` (generated, or the caller's own if it is a safe 1–64 character id).
+- The server writes one JSON line per request (time, request id, method, path, status, duration, client role and id). Query strings, headers and bodies are never logged. Set `LOG_REQUESTS=false` to turn this off.
+- Server errors are logged under the same request id, so a problem a client reports can be found from its `X-Request-Id`.
+
 ## Error contract
 
 Every error response uses the same body (WSO2 §11):

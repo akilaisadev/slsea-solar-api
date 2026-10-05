@@ -2,6 +2,7 @@ import express from 'express';
 import helmet from 'helmet';
 import { config } from './config.js';
 import { requireJsonAccept } from './middleware/negotiate.js';
+import { requestId, accessLog } from './middleware/observability.js';
 import { allowOnly } from './middleware/allow.js';
 import { notFound, errorHandler } from './middleware/errorHandler.js';
 import { healthRouter } from './routes/health.js';
@@ -11,7 +12,7 @@ import { apiRouter } from './routes/api.js';
 import { oauthRouter } from './routes/oauth.js';
 import { absoluteUrl } from './lib/urls.js';
 
-export function createApp({ db }) {
+export function createApp({ db, logRequests = config.logRequests }) {
   const app = express();
   app.locals.db = db;
 
@@ -21,6 +22,8 @@ export function createApp({ db }) {
   // Render terminates TLS at its proxy; trust X-Forwarded-Proto for https URLs.
   app.set('trust proxy', 1);
 
+  app.use(requestId);
+  app.use(accessLog({ enabled: logRequests }));
   app.use(helmet());
   app.use(express.json({ limit: '10kb', type: ['application/json', 'application/merge-patch+json'] }));
 

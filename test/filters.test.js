@@ -130,3 +130,10 @@ test('invalid filters are rejected with 400', async () => {
     assertErrorBody(res, 400, 40001);
   }
 });
+
+test('a jurisdiction filter that matches no installation is an empty page, not an error', async () => {
+  const res = await national.get(`${BASE}/readings?district-id=ds-99`);
+  assert.equal(res.status, 200);
+  assert.equal(res.body.count, 0);
+  assert.deepEqual(res.body.items, []);
+});

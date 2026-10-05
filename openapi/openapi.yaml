@@ -23,6 +23,8 @@ info:
     (`power_kw`, `energy_kwh`, `voltage_v`); timestamps are ISO 8601 UTC; collections are paginated with
     `offset`/`limit` and return `count`, `next` and `previous`; every GET supports conditional requests
     (`If-None-Match` / `If-Modified-Since` → `304`); every error uses the `Error` schema.
+    Every response carries an `X-Request-Id` header (a client-supplied one of up to 64 safe characters
+    is kept); quote it when reporting a problem.
 servers:
   - url: /solar/v1
     description: This deployment (versioned base path)

@@ -286,3 +286,23 @@ Each increment records the prompt I gave, what was generated, and what the revie
 | 5 | Validation limits were bare numbers (`max(500)`, `min(5.8)`, `* 1.25`) with no explanation. | Readability, viva | Named constants with reasons in `src/lib/limits.js`, matching the database CHECK constraints. |
 | 6 | Coverage was measured for the first time: 98.8% lines, 94.2% branches, 99.4% functions. The untested lines were safety nets: the startup config check, fail-closed jurisdiction, the generic 500 (now checked not to leak internal error text), unknown error codes, and client credentials without a secret. | Test validity | Added tests for each. Coverage is now 99.8% lines, 95.4% branches and 100% functions, gated in CI (95/90/95). I confirmed the gate fails a run below its threshold. |
 | 7 | The one SQL statement in a route file was the readiness probe's `SELECT 1`. | Layering | Moved into `src/db` (`pingDatabase`). The README documents the layering rules, and a check shows no route contains SQL and no repository touches `req`/`res`. |
+
+---
+
+## Production hardening (branch `improve/production-hardening`)
+
+**Prompt:** "make a new branch do some improvements push code". I chose hardening for going live: safe concurrent ingestion, traceable logs, and the slowest query.
+
+**Generated:** an upload lock and next-reading check (`src/repositories/readings.js`, `src/routes/installationReadings.js`), `src/middleware/observability.js` (request ids, access log), the two-step regional readings query, and `test/ingestion.test.js` and `test/observability.test.js`.
+
+**Review findings and fixes:**
+
+| # | Finding | Why it matters | Fix |
+|---|---|---|---|
+| 1 | Two readings for the same installation arriving together could both pass the cumulative-counter check against the same neighbours, leaving the series out of order. | Data integrity (append-only time series) | Each upload runs in a transaction holding a PostgreSQL advisory lock for its installation; other installations still upload in parallel. |
+| 2 | **Honest test note:** the HTTP test with two conflicting uploads passed 6 of 6 times *even with the lock removed*, because the requests never actually overlapped on a fast local machine. It documents the rule but doesn't prove the lock. | Test validity | Added a deterministic test that holds the lock in one transaction and checks that a second one waits. Verified that it **fails** with the lock removed and passes with it. |
+| 3 | The counter check only looked backwards. A buffering device uploading a late (back-filled) reading could store a counter higher than the reading that follows it. | Data integrity | The reading must also not exceed the next one. Tested with valid and invalid back-fills. |
+| 4 | Nothing linked a client's error to the server logs, and the logs were unstructured. | Deployment and operation | Every response has `X-Request-Id`, plus one JSON log line per request; errors are logged under the same id. A client-supplied id is kept only if it's 1–64 safe characters, so it can't inject text into the logs. Query strings, headers and bodies are never logged, and a test asserts the bearer token never appears. |
+| 5 | The regional `/readings` count joined every reading (about 200k) to three tables. | Performance | Resolve the caller's visible installations first, then filter readings by id. Measured on the full dataset: SQL 159 → 98 ms; HTTP 117 → 53 ms (best of 5). Correction: the earlier "0.35–0.5 s" figure was measured before `VACUUM ANALYZE`, with stale statistics. |
+| 6 | **My own test-data mistake, again:** the new "uploads after the latest reading" tests stepped forward in whole minutes, so depending on the time of day the last upload landed more than 5 minutes in the future and the API refused it (a flaky failure). | Test reliability | 10-second steps. Three consecutive full runs passed. |
+| 7 | ESLint flagged the test helper that temporarily replaces `console` methods to capture log output. | Lint configuration | Rule relaxed for `test/**` only. |
