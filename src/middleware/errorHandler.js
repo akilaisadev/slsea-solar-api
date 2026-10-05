@@ -20,14 +20,14 @@ function isDatabaseUnavailable(err) {
 
 // Maps errors raised by Express's body parser and by the database driver onto
 // the catalogue, so they share the §11 body shape with every other error.
-function fromFrameworkError(err) {
+function fromFrameworkError(err, req) {
   if (err.type === 'entity.parse.failed') return new ApiError(40003, 'The request body is not valid JSON.');
   if (err.type === 'entity.too.large') return new ApiError(41301, 'The request body exceeds the 10 kB limit.');
   if (err.type === 'encoding.unsupported' || err.type === 'charset.unsupported') {
     return new ApiError(41501, 'The request body encoding is not supported.');
   }
   if (isDatabaseUnavailable(err)) {
-    console.error(`Database unavailable: ${err.code ?? ''} ${err.message}`);
+    console.error(`[${req.id}] Database unavailable: ${err.code ?? ''} ${err.message}`);
     return new ApiError(50301, 'The service is temporarily unavailable. Please retry shortly.', {
       headers: { 'Retry-After': '30' },
     });
@@ -38,9 +38,11 @@ function fromFrameworkError(err) {
 // Express 5 forwards rejected promises from async handlers here, so route
 // code can simply throw an ApiError.
 export function errorHandler(err, req, res, next) {
-  let apiError = err instanceof ApiError ? err : fromFrameworkError(err);
+  let apiError = err instanceof ApiError ? err : fromFrameworkError(err, req);
   if (!apiError) {
-    console.error(err);
+    // The client only sees a generic message; the details stay in the log
+    // under the same request id the client received.
+    console.error(`[${req.id}]`, err);
     apiError = new ApiError(50001, 'An unexpected error occurred.');
   }
   if (res.headersSent) return next(err);
