@@ -4,7 +4,7 @@
   "description": "SLSEA Real-Time Solar Generation Data API (NB6007CEM Web API Development coursework)",
   "private": true,
   "type": "module",
-  "main": "src/server.js",
+  "main": "index.js",
   "engines": {
     "node": ">=22"
   },
