@@ -19,7 +19,7 @@ export function createApp({ db, logRequests = config.logRequests }) {
   app.disable('x-powered-by');
   // ETags are generated explicitly per resource (WSO2 §10.4), not by Express.
   app.set('etag', false);
-  // Render terminates TLS at its proxy; trust X-Forwarded-Proto for https URLs.
+  // The host (Vercel/Render) terminates TLS at its proxy; trust X-Forwarded-Proto for https URLs.
   app.set('trust proxy', 1);
 
   app.use(requestId);

@@ -4,7 +4,7 @@ import globals from 'globals';
 // One shared style for every JavaScript file, checked in CI, so code
 // quality is enforced by a tool rather than by eye.
 export default [
-  { ignores: ['node_modules/', 'coverage/'] },
+  { ignores: ['node_modules/', 'coverage/', 'coursework/'] },
   js.configs.recommended,
   {
     files: ['**/*.js'],

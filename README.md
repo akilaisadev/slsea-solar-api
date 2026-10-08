@@ -3,8 +3,9 @@
 NB6007CEM Web API Development coursework: a REST API that ingests and serves real-time and historical generation data from rooftop solar installations for the Sri Lanka Sustainable Energy Authority (SLSEA).
 
 - **Design authority:** WSO2 REST API Design Guidelines (Richardson Maturity Level 2)
-- **Stack:** Node.js 24, Express 5, PostgreSQL (Neon), deployed on Render
+- **Stack:** Node.js 24, Express 5, PostgreSQL (Neon), deployed on Vercel (Singapore)
 - **Base path:** `/solar/v1`
+- **Live:** https://slsea-solar-api-seven.vercel.app/solar/v1 · Swagger: https://slsea-solar-api-seven.vercel.app/docs
 
 ## Local development
 
