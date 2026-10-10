@@ -65,9 +65,12 @@ try {
   check(small ? 'test fixture: installation with no readings' : 'no empty installation histories',
     edge.without_readings, small ? edge.without_readings >= 1 : edge.without_readings === 0);
 
+  // Assess the current seeded catalogue, as for history coverage above.
+  // Decommissioned API test fixtures remain audit history, not seed sites.
   const night = await one(`SELECT count(*) AS night_rows, count(*) FILTER (WHERE power_kw > 0) AS night_generating
-    FROM generation_reading
-    WHERE extract(hour FROM recorded_at AT TIME ZONE 'Asia/Colombo') NOT BETWEEN 6 AND 18`);
+    FROM generation_reading r JOIN solar_installation i USING (installation_id)
+    WHERE i.status <> 'decommissioned'
+      AND extract(hour FROM recorded_at AT TIME ZONE 'Asia/Colombo') NOT BETWEEN 6 AND 18`);
   check('zero generation overnight', `${night.night_generating} of ${night.night_rows}`, night.night_generating === 0);
 
   const monotonic = await one(`SELECT count(*) AS decreases FROM (
