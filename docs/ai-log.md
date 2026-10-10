@@ -336,3 +336,6 @@ Each increment records the prompt I gave, what was generated, and what the revie
 
 
 **Verification fixture correction:** decommissioned live-test assets retain their history by design. The seed check's overnight generation query now uses the current catalogue, consistently with its history-coverage query, so retained test readings are not mistaken for the 240 seeded installation histories. Regional history continues to include these audit records. Foreign-key and cumulative-counter checks still inspect all stored readings.
+
+
+**README follow-up:** the user requested “add this for readme bro”. Codex added the verified deployment results, lecturer repository access, synthetic demo staff/device credentials and Swagger testing steps to the private repository README, and replaced the inaccurate claim that the credentials were already in the report appendix. The report PDF was not changed.
