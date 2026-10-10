@@ -60,7 +60,7 @@ if (current.body.commissioned_on !== model.commissioned_on) {
     token: admin, method: 'PATCH', type: 'application/merge-patch+json',
     headers: { 'If-Match': current.headers.get('etag') }, body: { commissioned_on: model.commissioned_on },
   });
-  if (updated.status !== 200) throw new Error(`Commissioning date correction failed (${updated.status}).`);
+  if (![200, 204].includes(updated.status)) throw new Error(`Commissioning date correction failed (${updated.status}).`);
 }
 
 const readings = [...readingsBetween(model, start, end)].map((reading) => ({

@@ -320,3 +320,16 @@ Each increment records the prompt I gave, what was generated, and what the revie
 **Live repair:** appended 673 synthetic 15-minute seed readings to `ins-0240`, from `2026-10-03T17:00:00Z` through `2026-10-10T17:00:00Z` (seven days). The API returned 201 for all 673 uploads; the created Location URL resolved with 200. These are generated coursework data, not measurements from physical hardware.
 
 **Validation:** all 115 automated tests passed against a separate local test database, including regressions for full-seed history coverage and the explicit empty-history test fixture. The live history was checked in ascending and descending order. All 12 live seed checks passed: 240/240 catalogue installations have seven or more days of history, no catalogue installation has empty history, foreign keys are consistent, and cumulative energy counters never decrease. ESLint passed. The report PDF was not edited.
+
+
+## Deployed API verification and conditional-write repair — 10 October 2026
+
+**AI aid:** Codex (OpenAI).
+
+**Directing prompt:** “now all work? can lecture access all?? can test all??”
+
+**Observed fault:** a live PATCH with the current If-Match ETag committed successfully in the function, but Vercel returned a plain-text PRECONDITION_FAILED / 412 response to the caller. A subsequent GET confirmed the edit, making the failure misleading.
+
+**Generated and reviewed:** successful conditional PUT/PATCH/DELETE requests now return 204 without a response entity or validators. The client retrieves the updated representation through GET. Ordinary writes keep their existing 200 responses. Transactional precondition checks and stale-write 412 errors remain intact. Updated the OpenAPI responses, the history-repair utility, and regression tests covering successful writes, unchanged state after stale writes, and conditional deletion. The report PDF was not edited.
+
+**Validation:** 116 automated tests passed against the separate local test database. Live verification confirmed a successful conditional PATCH returns 204 and the subsequent GET contains the saved change. All 136 live checks passed across all 22 published operations, including current/stale conditional PUT, PATCH and DELETE, If-Unmodified-Since, five staff logins, device authentication and ingestion, jurisdiction boundaries, filtering, pagination, append-only readings, error schemas, and cleanup. Full deployment checks are recorded separately in the verification evidence.

@@ -9,6 +9,14 @@ import { paginated } from './pagination.js';
 // resource's GET representation (POST /installations adds a one-time
 // device_secret that is not part of the resource's state).
 export function sendRepresentation(req, res, body, { lastModified, status = 200, etag: etagOverride } = {}) {
+  // A successful conditional write has no response entity: retrieve the new
+  // representation with GET. This also prevents the hosting CDN from
+  // re-testing the old validator against a post-update response entity.
+  if (['PUT', 'PATCH', 'DELETE'].includes(req.method) &&
+      (req.get('If-Match') || req.get('If-Unmodified-Since'))) {
+    res.set('Cache-Control', 'no-store');
+    return res.status(204).end();
+  }
   const json = JSON.stringify(body);
   const etag = etagOverride ?? etagOf(json);
   res.set('ETag', etag);

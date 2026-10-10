@@ -167,6 +167,7 @@ installationsRouter.route('/:installationId')
       return decommissionInstallation(tx, req.params.installationId);
     });
     res.set('Cache-Control', 'no-store');
+    if (req.get('If-Match') || req.get('If-Unmodified-Since')) return res.status(204).end();
     res.json(toDecommissionedInstallation(removed));
   })
   .all(allowOnly('GET', 'PUT', 'PATCH', 'DELETE'));

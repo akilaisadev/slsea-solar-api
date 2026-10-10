@@ -478,7 +478,8 @@ paths:
       description: |
         PUT replaces the complete resource (WSO2 §7.2): every writable field is required; a missing field is
         an error, not "keep the old value" (use PATCH for that). Idempotent. Send `If-Match` with the ETag
-        you last saw to avoid overwriting someone else's change (412 if it is stale).
+        you last saw to avoid overwriting someone else's change (412 if it is stale). A successful
+        conditional write returns 204 without a response body; GET the resource for its new representation.
       operationId: replaceInstallation
       parameters:
         - $ref: '#/components/parameters/IfMatch'
@@ -497,6 +498,8 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/InstallationComposite' }
+        '204':
+          description: Conditional write succeeded; no response body.
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -513,7 +516,8 @@ paths:
       summary: Update some fields of an installation (JSON Merge Patch)
       description: |
         Partial update as a JSON Merge Patch (RFC 7396): send only the fields to change. `If-Match` gives
-        optimistic concurrency control (412 if stale).
+        optimistic concurrency control (412 if stale). A successful conditional write returns 204
+        without a response body; GET the resource for its new representation.
       operationId: updateInstallation
       parameters:
         - $ref: '#/components/parameters/IfMatch'
@@ -534,6 +538,8 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/InstallationComposite' }
+        '204':
+          description: Conditional write succeeded; no response body.
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -550,7 +556,8 @@ paths:
       summary: Decommission an installation
       description: |
         Removes the installation from the API (WSO2 §7.4): 200 the first time, 404 afterwards. Its readings
-        are kept as generation history, and its device can no longer obtain tokens.
+        are kept as generation history, and its device can no longer obtain tokens. Successful
+        conditional deletion returns 204 without a response body.
       operationId: decommissionInstallation
       parameters:
         - $ref: '#/components/parameters/IfMatch'
@@ -561,6 +568,8 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/DecommissionedInstallation' }
+        '204':
+          description: Conditional write succeeded; no response body.
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }

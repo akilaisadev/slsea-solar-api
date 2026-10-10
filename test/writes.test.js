@@ -202,7 +202,10 @@ test('If-Match: a stale ETag gets 412 and changes nothing; the current one succe
   const original = created.headers.etag;
 
   const updated = await admin.patch(uri).set('If-Match', original).send({ capacity_kw: 3.5 });
-  assert.equal(updated.status, 200);
+  assert.equal(updated.status, 204);
+  assert.equal(updated.text, '');
+  assert.equal(updated.headers.etag, undefined);
+  assert.equal((await admin.get(uri)).body.capacity_kw, 3.5);
 
   // A second client still holding the original ETag tries to edit.
   const stale = await admin.patch(uri).set('If-Match', original).send({ capacity_kw: 99 });
@@ -212,7 +215,29 @@ test('If-Match: a stale ETag gets 412 and changes nothing; the current one succe
   assert.equal((await admin.get(uri)).body.capacity_kw, 3.5, 'the stale writes changed nothing');
 
   const current = await admin.get(uri);
-  assert.equal((await admin.patch(uri).set('If-Match', current.headers.etag).send({ capacity_kw: 4 })).status, 200);
+  assert.equal((await admin.patch(uri).set('If-Match', current.headers.etag).send({ capacity_kw: 4 })).status, 204);
+  assert.equal((await admin.get(uri)).body.capacity_kw, 4);
+});
+
+test('conditional PUT and DELETE return 204 after applying the change; stale dates change nothing', async () => {
+  const created = await admin.post(`${BASE}/installations`).send(newSite({ capacity_kw: 3 }));
+  const uri = pathOf(created.headers.location);
+  const before = await admin.get(uri);
+  const replacement = newSite({ inverter_id: created.body.inverter_id, capacity_kw: 4 });
+  const put = await admin.put(uri).set('If-Match', before.headers.etag).send(replacement);
+  assert.equal(put.status, 204);
+  assert.equal(put.text, '');
+  assert.equal((await admin.get(uri)).body.capacity_kw, 4);
+  assertErrorBody(await admin.patch(uri).set('If-Unmodified-Since', 'Thu, 01 Jan 1970 00:00:00 GMT').send({ capacity_kw: 99 }), 412, 41201);
+  const current = await admin.get(uri);
+  const patch = await admin.patch(uri).set('If-Unmodified-Since', current.headers['last-modified']).send({ capacity_kw: 5 });
+  assert.equal(patch.status, 204);
+  assert.equal((await admin.get(uri)).body.capacity_kw, 5);
+  const last = await admin.get(uri);
+  const deleted = await admin.delete(uri).set('If-Match', last.headers.etag);
+  assert.equal(deleted.status, 204);
+  assert.equal(deleted.text, '');
+  assertErrorBody(await admin.get(uri), 404, 40401);
 });
 
 test('DELETE decommissions: 200 once, then 404; readings are kept; the device is locked out', async () => {
