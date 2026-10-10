@@ -23,8 +23,8 @@ const now = Date.now();
 const lastSlot = floorToSlot(now);
 const firstSlot = Math.max(MODEL_EPOCH, lastSlot - (lookbackSlots - 1) * SLOT_MS);
 
-// Only the sites that report normally; the maintenance sites stay silent and
-// the newly registered site has no device online yet.
+// Only the sites that report normally; maintenance sites stay silent.
+// Empty-history fixtures are confined to the separate small test seed.
 const devices = buildInstallations({ today: '2026-01-01' }).filter((inst) => inst.reporting === 'normal');
 
 const tally = { created: 0, duplicate: 0, failed: 0 };

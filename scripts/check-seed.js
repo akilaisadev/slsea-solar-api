@@ -19,7 +19,7 @@ try {
     (SELECT count(*) FROM province) AS provinces,
     (SELECT count(*) FROM district) AS districts,
     (SELECT count(*) FROM grid_substation) AS substations,
-    (SELECT count(*) FROM solar_installation) AS installations,
+    (SELECT count(*) FROM solar_installation WHERE status <> 'decommissioned') AS installations,
     (SELECT count(*) FROM generation_reading) AS readings,
     (SELECT count(*) FROM app_user) AS users`);
   check('9 provinces', counts.provinces, counts.provinces === 9);
@@ -43,21 +43,27 @@ try {
   check('every district has a substation', coverage.empty_districts, coverage.empty_districts === 0);
   check('every substation has installations', coverage.empty_substations, small || coverage.empty_substations === 0);
 
+  // Match the live catalogue: decommissioned assets are retained for audit
+  // but have left the API; every remaining installation needs a full week.
   const history = await one(`
     WITH spans AS (
-      SELECT installation_id, max(recorded_at) - min(recorded_at) AS span, count(*) AS n
-      FROM generation_reading GROUP BY installation_id
+      SELECT i.installation_id, max(r.recorded_at) - min(r.recorded_at) AS span, count(r.reading_id) AS n
+      FROM solar_installation i LEFT JOIN generation_reading r USING (installation_id)
+      WHERE i.status <> 'decommissioned'
+      GROUP BY i.installation_id
     )
     SELECT count(*) FILTER (WHERE span >= interval '7 days') AS week_or_more,
-           count(*) AS reporting,
+           count(*) AS installations,
            min(n) AS min_readings
     FROM spans`);
-  check('reporting installations with 7+ days of history', `${history.week_or_more}/${history.reporting}`,
-    small || history.week_or_more === history.reporting);
+  check('every installation has 7+ days of history', `${history.week_or_more}/${history.installations}`,
+    small || history.week_or_more === history.installations);
 
   const edge = await one(`SELECT count(*) AS without_readings FROM solar_installation i
-    WHERE NOT EXISTS (SELECT 1 FROM generation_reading r WHERE r.installation_id = i.installation_id)`);
-  check('edge case: installation with no readings', edge.without_readings, edge.without_readings >= 1);
+    WHERE i.status <> 'decommissioned'
+      AND NOT EXISTS (SELECT 1 FROM generation_reading r WHERE r.installation_id = i.installation_id)`);
+  check(small ? 'test fixture: installation with no readings' : 'no empty installation histories',
+    edge.without_readings, small ? edge.without_readings >= 1 : edge.without_readings === 0);
 
   const night = await one(`SELECT count(*) AS night_rows, count(*) FILTER (WHERE power_kw > 0) AS night_generating
     FROM generation_reading

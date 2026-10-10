@@ -306,3 +306,17 @@ Each increment records the prompt I gave, what was generated, and what the revie
 | 5 | The regional `/readings` count joined every reading (about 200k) to three tables. | Performance | Resolve the caller's visible installations first, then filter readings by id. Measured on the full dataset: SQL 159 → 98 ms; HTTP 117 → 53 ms (best of 5). Correction: the earlier "0.35–0.5 s" figure was measured before `VACUUM ANALYZE`, with stale statistics. |
 | 6 | **My own test-data mistake, again:** the new "uploads after the latest reading" tests stepped forward in whole minutes, so depending on the time of day the last upload landed more than 5 minutes in the future and the API refused it (a flaky failure). | Test reliability | 10-second steps. Three consecutive full runs passed. |
 | 7 | ESLint flagged the test helper that temporarily replaces `console` methods to capture log output. | Lint configuration | Rule relaxed for `test/**` only. |
+
+---
+
+## Coursework seed coverage repair — 10 October 2026
+
+**AI aid:** Codex (OpenAI).
+
+**Directing prompt:** "can u do that now??", following the requirement to give every seeded installation at least seven days of readings.
+
+**Generated and reviewed:** the full seed now includes history for `ins-0240`; empty-history fixtures are enabled explicitly only for the small test seed. The checker uses a left join so installations with zero readings cannot disappear from its coverage calculation. Decommissioned audit records are excluded consistently with the live installation catalogue. The simulator includes the formerly empty installation. Added a backfill utility that authenticates through the deployed API, aligns the installation with its deterministic seed model, and posts readings as its own device without replacing existing history.
+
+**Live repair:** appended 673 synthetic 15-minute seed readings to `ins-0240`, from `2026-10-03T17:00:00Z` through `2026-10-10T17:00:00Z` (seven days). The API returned 201 for all 673 uploads; the created Location URL resolved with 200. These are generated coursework data, not measurements from physical hardware.
+
+**Validation:** all 115 automated tests passed against a separate local test database, including regressions for full-seed history coverage and the explicit empty-history test fixture. The live history was checked in ascending and descending order. All 12 live seed checks passed: 240/240 catalogue installations have seven or more days of history, no catalogue installation has empty history, foreign keys are consistent, and cumulative energy counters never decrease. ESLint passed. The report PDF was not edited.

@@ -61,7 +61,7 @@ const CAPACITIES = [2, 3, 3, 4, 5, 5, 5, 6, 8, 10, 10, 12, 15, 20, 30, 40];
 // Every substation gets at least MIN_PER_SUBSTATION sites; the rest are
 // spread by district weight. Output is sorted by substation so IDs group
 // geographically (ins-0001.. are in Colombo).
-export function buildInstallations({ today }) {
+export function buildInstallations({ today, includeEmptyHistory = false }) {
   const counts = SUBSTATIONS.map(() => MIN_PER_SUBSTATION);
   // A district's weight is shared equally between its substations.
   const weights = SUBSTATIONS.map((s) => s.district.weight / s.district.substations.length);
@@ -92,16 +92,18 @@ export function buildInstallations({ today }) {
     }
   });
 
-  // Edge cases the API must handle: three sites under maintenance that
-  // stopped reporting two days ago, and one site registered today with no
-  // readings yet (empty history, null last reading).
+  // Maintenance sites retain a full week of historical readings. The
+  // coursework dataset must give every installation at least a week;
+  // a newly registered site with empty history belongs only in test data.
   for (const n of [17, 101, 187]) {
     installations[n - 1].status = 'maintenance';
     installations[n - 1].reporting = 'stopped-2-days-ago';
   }
-  const newest = installations[installations.length - 1];
-  newest.commissioned_on = today;
-  newest.reporting = 'none';
+  if (includeEmptyHistory) {
+    const newest = installations[installations.length - 1];
+    newest.commissioned_on = today;
+    newest.reporting = 'none';
+  }
   return installations;
 }
 

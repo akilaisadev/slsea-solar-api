@@ -26,7 +26,7 @@ const end = floorToSlot(now);
 const start = end - days * DAY_MS;
 const todayInColombo = new Date(now + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
-let installations = buildInstallations({ today: todayInColombo });
+let installations = buildInstallations({ today: todayInColombo, includeEmptyHistory: small });
 if (small) {
   installations = installations.filter((inst, i) => i % 6 === 0 || inst.reporting !== 'normal');
 }
